@@ -1,21 +1,3 @@
-/*
-struct vector2_t
-{
-    float x;
-    float y;
-
-    vector2_t operator*(const float& multiplier) const 
-    {
-        vector2_t result = { 0 };
-
-        result.x = x * multiplier;
-        result.y = y * multiplier;
-        
-        return result;
-    }
-};
-*/
-
 struct vector3_t
 {
     float x;

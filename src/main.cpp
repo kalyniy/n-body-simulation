@@ -7,11 +7,12 @@
 #include <math.h>
 #include <algorithm>
 
-#include "includes/Particle.hpp"
+#include "Particle.hpp"
+#include "DatasetLoader.h"
 
 int WIDTH = 300;
 int LENGTH = 300;
-int HEIGHT = 300; 
+int HEIGHT = 300;
 
 float MIN = 0.0001f;
 
@@ -19,15 +20,15 @@ void displayMe(void)
 {
     glClear(GL_COLOR_BUFFER_BIT);
     glBegin(GL_POLYGON);
-        glVertex3f(0.5, 0.0, 0.5);
-        glVertex3f(0.5, 0.0, 0.0);
-        glVertex3f(0.0, 0.5, 0.0);
-        glVertex3f(0.0, 0.0, 0.5);
+    glVertex3f(0.5, 0.0, 0.5);
+    glVertex3f(0.5, 0.0, 0.0);
+    glVertex3f(0.0, 0.5, 0.0);
+    glVertex3f(0.0, 0.0, 0.5);
     glEnd();
     glFlush();
 }
 
-void setupOpenGl(int* argc, char** argv)
+void setupOpenGl(int *argc, char **argv)
 {
     glutInit(argc, argv);
     glutInitDisplayMode(GLUT_SINGLE);
@@ -40,18 +41,18 @@ void setupOpenGl(int* argc, char** argv)
 
 float randomFloat(int min, int max)
 {
-    float difference = (float)(max-min);
-    float number = min + static_cast<float>(rand())/(static_cast<float>(RAND_MAX/(difference)));
+    float difference = (float)(max - min);
+    float number = min + static_cast<float>(rand()) / (static_cast<float>(RAND_MAX / (difference)));
     return number;
 }
 
-void generateRandomParticles(std::vector<particle_t>* particles, size_t n)
+void generateRandomParticles(std::vector<particle_t> *particles, size_t n)
 {
     for (size_t i = 0; i < n; i++)
     {
         std::cout << i << std::endl;
-        particle_t particle = { 0 };
-        
+        particle_t particle = {0};
+
         particle.position = {0};
 
         particle.position.x = randomFloat(0, WIDTH);
@@ -65,7 +66,7 @@ void generateRandomParticles(std::vector<particle_t>* particles, size_t n)
     }
 }
 
-void update(std::vector<particle_t>* particles) 
+void update(std::vector<particle_t> *particles)
 {
     auto size = particles->size();
     for (size_t i = 0; i < size; i++)
@@ -90,7 +91,7 @@ void update(std::vector<particle_t>* particles)
             auto mag = std::sqrt(mag_sq);
 
             float part1 = (m2 / (std::max(mag_sq, MIN) * mag));
-            
+
             auto a1 = r * part1;
 
             particle.acceleration = 1;
@@ -98,19 +99,29 @@ void update(std::vector<particle_t>* particles)
     }
 }
 
-int main(int argc, char** argv)
+int main(int argc, char **argv)
 {
-    //using namespace std;
+    auto url = "/home/dan/Desktop/1billionparticles_onesnapshot";
 
-    //srand(time(NULL));
-    srand (static_cast<unsigned>(time(0)));
+    auto P = DatasetLoader::load_hacc_snapshot(url);
+
+    std::cout << "Loaded " << P.N << " particles\n";
+    std::cout << "x[0..4]: ";
+    for (int i = 0; i < 5; i++)
+        std::cout << P.x[i] << " ";
+    std::cout << "\n";
+
+    // using namespace std;
+
+    // srand(time(NULL));
+    srand(static_cast<unsigned>(time(0)));
 
     size_t n = 4096;
 
 #ifdef N_PARTICLES
     n = N_PARTICLES;
 #endif
-    std::vector<particle_t>* particles = new std::vector<particle_t>();
+    std::vector<particle_t> *particles = new std::vector<particle_t>();
 
     generateRandomParticles(particles, n);
 
@@ -123,7 +134,7 @@ int main(int argc, char** argv)
         std::cout << "Updated particles" << std::endl;
     }
 
-    //setupOpenGl(&argc, argv);
+    // setupOpenGl(&argc, argv);
     delete particles;
 
     return 0;

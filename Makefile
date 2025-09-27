@@ -1,23 +1,48 @@
 CXX = g++
 
-CXXFLAGS = -std=c++11 -Wall -O2
+CXXFLAGS = -std=c++20 -Wall -O2 -I./include
 
 LDFLAGS = -lglut -lGLU -lGL
 
-TARGET = main
+SRC_DIR = src
+INC_DIR = include
+BIN_DIR = bin
 
-SRC = main.cpp
+TARGET = $(BIN_DIR)/main
 
-OBJ = $(SRC:.cpp=.o)
+# Find all source files
+SOURCES = $(wildcard $(SRC_DIR)/*.cpp)
+OBJECTS = $(SOURCES:$(SRC_DIR)/%.cpp=$(BIN_DIR)/%.o)
 
-all: $(TARGET)
+all: $(BIN_DIR) $(TARGET)
 
-$(TARGET): $(OBJ)
+$(BIN_DIR):
+	mkdir -p $(BIN_DIR)
+
+$(TARGET): $(OBJECTS)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+	@echo "Build complete: $(TARGET)"
 
-$(OBJ): $(SRC)
+$(BIN_DIR)/%.o: $(SRC_DIR)/%.cpp
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
 .PHONY: clean
 clean:
-	rm -f $(TARGET) $(OBJ)
+	rm -rf $(BIN_DIR)
+
+.PHONY: run
+run: all
+	./$(TARGET)
+
+.PHONY: debug
+debug: CXXFLAGS += -g -DDEBUG
+debug: clean all
+
+.PHONY: help
+help:
+	@echo "Available targets:"
+	@echo "  all    - Build the project (default)"
+	@echo "  clean  - Remove all build artifacts"
+	@echo "  run    - Build and run the executable"
+	@echo "  debug  - Build with debug symbols"
+	@echo "  help   - Show this help message"
