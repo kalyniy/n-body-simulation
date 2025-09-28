@@ -1,5 +1,6 @@
 #include "DatasetLoader.h"
-#include <filesystem>
+
+#include <stdio.h>
 
 using std::size_t;
 
@@ -22,7 +23,7 @@ void DatasetLoader::read_f32(const std::string &path, float *dst, size_t N)
         throw std::runtime_error("Short read on " + path);
 }
 
-ParticlesSOA DatasetLoader::load_hacc_snapshot(const std::string &dir)
+void DatasetLoader::load_hacc_snapshot(std::vector<particle_t> *particles, const std::string &dir)
 {
     const std::string fx = dir + "/xx.f32", fy = dir + "/yy.f32", fz = dir + "/zz.f32";
     const std::string fvx = dir + "/vx.f32", fvy = dir + "/vy.f32", fvz = dir + "/vz.f32";
@@ -32,20 +33,49 @@ ParticlesSOA DatasetLoader::load_hacc_snapshot(const std::string &dir)
     if (!(Nx == Ny && Nx == Nz && Nx == Nvx && Nx == Nvy && Nx == Nvz))
         throw std::runtime_error("Array sizes differ");
 
-    ParticlesSOA P;
-    P.N = Nx;
-    P.x = std::make_unique<float[]>(P.N);
-    P.y = std::make_unique<float[]>(P.N);
-    P.z = std::make_unique<float[]>(P.N);
-    P.vx = std::make_unique<float[]>(P.N);
-    P.vy = std::make_unique<float[]>(P.N);
-    P.vz = std::make_unique<float[]>(P.N);
+    printf("[HACC Dataset] Found %lu particles.\n", Nx);
 
-    read_f32(fx, P.x.get(), P.N);
-    read_f32(fy, P.y.get(), P.N);
-    read_f32(fz, P.z.get(), P.N);
-    read_f32(fvx, P.vx.get(), P.N);
-    read_f32(fvy, P.vy.get(), P.N);
-    read_f32(fvz, P.vz.get(), P.N);
-    return P;
+    particles->reserve(Nx);
+
+    auto vectorX = std::make_unique<float[]>(Nx);
+    auto vectorY = std::make_unique<float[]>(Nx);
+    auto vectorZ = std::make_unique<float[]>(Nx);
+    auto vectorVx = std::make_unique<float[]>(Nx);
+    auto vectorVy = std::make_unique<float[]>(Nx);
+    auto vectorVz = std::make_unique<float[]>(Nx);
+
+    printf("reading vector of x...\n");
+    read_f32(fx, vectorX.get(), Nx);
+
+    printf("reading vector of y...\n");
+    read_f32(fy, vectorY.get(), Nx);
+
+    printf("reading vector of z...\n");
+    read_f32(fz, vectorZ.get(), Nx);
+
+    printf("reading vector of vx...\n");
+    read_f32(fvx, vectorVx.get(), Nx);
+
+    printf("reading vector of vy...\n");
+    read_f32(fvy, vectorVy.get(), Nx);
+
+    printf("reading vector of vz...\n");
+    read_f32(fvz, vectorVz.get(), Nx);
+
+    for (size_t i = 0; i < Nx; i++)
+    {
+        particle_t p = {0};
+        p.position.x = vectorX[i];
+        p.position.y = vectorY[i];
+        p.position.z = vectorZ[i];
+
+        particles->push_back(p);
+    }
+
+    vectorX.release();
+    vectorY.release();
+    vectorZ.release();
+    vectorVx.release();
+    vectorVy.release();
+    vectorVz.release();
 }

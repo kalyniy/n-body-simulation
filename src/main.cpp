@@ -101,41 +101,54 @@ void update(std::vector<particle_t> *particles)
 
 int main(int argc, char **argv)
 {
-    auto url = "/home/dan/Desktop/1billionparticles_onesnapshot";
-
-    auto P = DatasetLoader::load_hacc_snapshot(url);
-
-    std::cout << "Loaded " << P.N << " particles\n";
-    std::cout << "x[0..4]: ";
-    for (int i = 0; i < 5; i++)
-        std::cout << P.x[i] << " ";
-    std::cout << "\n";
-
-    // using namespace std;
-
-    // srand(time(NULL));
     srand(static_cast<unsigned>(time(0)));
+    // srand(time(NULL));
 
-    size_t n = 4096;
-
-#ifdef N_PARTICLES
-    n = N_PARTICLES;
-#endif
     std::vector<particle_t> *particles = new std::vector<particle_t>();
 
-    generateRandomParticles(particles, n);
-
-    std::cout << particles->size() << std::endl;
-
-    for (size_t i = 0; i < particles->size(); i++)
+    if (argc > 1)
     {
-        sleep(1);
-        update(particles);
-        std::cout << "Updated particles" << std::endl;
+        // auto url = "/home/dan/Desktop/1billionparticles_onesnapshot";
+
+        DatasetLoader::load_hacc_snapshot(particles, argv[1]);
+
+        size_t size = particles->size();
+
+        std::cout << size << std::endl;
+#ifdef DEBUG
+        for (size_t i = 0; i < 100; i++)
+        {
+            particle_t &particle = particles->at(i);
+            printf("Particle[%ld] x: %f, y: %f, z: %f\n",
+                   i,
+                   particle.position.x,
+                   particle.position.y,
+                   particle.position.z);
+        }
+#endif
+    }
+    else
+    {
+        size_t n = 4096;
+
+#ifdef N_PARTICLES
+        n = N_PARTICLES;
+#endif
+
+        generateRandomParticles(particles, n);
+
+        std::cout << particles->size() << std::endl;
+
+        for (size_t i = 0; i < particles->size(); i++)
+        {
+            sleep(1);
+            update(particles);
+            std::cout << "Updated particles" << std::endl;
+        }
     }
 
-    // setupOpenGl(&argc, argv);
-    delete particles;
+    setupOpenGl(&argc, argv);
 
+    delete particles;
     return 0;
 }
