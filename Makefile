@@ -1,7 +1,7 @@
 CXX = g++
 
 CXXFLAGS = -std=c++20 -Wall -O2 -I./include
-CXXFLAGS += -DN_PARTICLES=10000
+CXXFLAGS += -DN_PARTICLES=300
 LDFLAGS = -lglut -lGLU -lGL
 
 SRC_DIR = src
