@@ -2,7 +2,21 @@ CXX = g++
 
 CXXFLAGS = -std=c++20 -Wall -O2 -I./include
 CXXFLAGS += -DN_PARTICLES=300
-LDFLAGS = -lglut -lGLU -lGL
+LDFLAGS = -lm
+
+UNAME_S := $(shell uname -s)
+# Platform-specific settings
+ifeq ($(UNAME_S),Linux)
+    CXXFLAGS += -DLINUX
+    # Add Linux-specific flags
+	LDFLAGS += -lglut -lGLU -lGL
+endif
+
+ifeq ($(UNAME_S),Darwin)
+    CXXFLAGS += -DMACOS
+    # Add macOS-specific flags
+    LDFLAGS += -framework OpenGL -framework GLUT
+endif
 
 SRC_DIR = src
 INC_DIR = include

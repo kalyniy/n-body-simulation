@@ -1,5 +1,16 @@
 #include <iostream>
+
+// #if defined(__linux__)
+// #include <GL/glut.h>
+// #else
+// #include <GLUT/glut.h>
+// #endif
+
+#ifdef MACOS
+#include <GLUT/glut.h>
+#else
 #include <GL/glut.h>
+#endif
 #include <vector>
 #include <stdlib.h>
 #include <time.h>
