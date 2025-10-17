@@ -1,0 +1,82 @@
+#include <chrono>
+#include <iostream>
+#include "Simulation.h"
+#include "PerformanceLogger.hpp"
+
+int main(int argc, char **argv)
+{
+    SimParams params;
+    params.G = 1.0f;
+    params.dt = 0.05f;
+    NBodySimulation sim(params);
+
+    // Basic CLI: headless_main [--hacc DIR] [--solar] [--random N] [--steps S] [--out file]
+    std::string out = "output.txt";
+    std::string hacc_dir;
+    std::size_t steps = 1000, randomN = 0;
+    bool use_solar = true;
+
+    for (int i = 1; i < argc; ++i)
+    {
+        std::string a = argv[i];
+        if (a == "--hacc" && i + 1 < argc)
+        {
+            hacc_dir = argv[++i];
+            use_solar = false;
+        }
+        else if (a == "--random" && i + 1 < argc)
+        {
+            randomN = std::stoul(argv[++i]);
+            use_solar = false;
+        }
+        else if (a == "--steps" && i + 1 < argc)
+        {
+            steps = std::stoul(argv[++i]);
+        }
+        else if (a == "--out" && i + 1 < argc)
+        {
+            out = argv[++i];
+        }
+        else if (a == "--dt" && i + 1 < argc)
+        {
+            params.dt = std::stof(argv[++i]);
+        }
+        else if (a == "--G" && i + 1 < argc)
+        {
+            params.G = std::stof(argv[++i]);
+        }
+    }
+
+    if (!hacc_dir.empty())
+    {
+        std::cout << "Loading HACC snapshot: " << hacc_dir << "\n";
+        sim.loadHACC(hacc_dir);
+    }
+    else if (randomN > 0)
+    {
+        std::cout << "Generating " << randomN << " random particles\n";
+        sim.generateRandom(randomN, 600, 600, 600);
+    }
+    else if (use_solar)
+    {
+        std::cout << "Setting up solar system\n";
+        sim.setupSolarSystem(600, 600, 600);
+    }
+
+    PerformanceLogger log(out);
+    if (!log.ok())
+        std::cerr << "Warning: could not open output log: " << out << "\n";
+
+    for (size_t s = 0; s < steps; ++s)
+    {
+        auto t0 = std::chrono::high_resolution_clock::now();
+        sim.step();
+        auto t1 = std::chrono::high_resolution_clock::now();
+        double dt = std::chrono::duration<double>(t1 - t0).count();
+        log.log(sim.particles().size(), dt, 0.0, "");
+        if ((s % 100) == 0)
+            std::cout << "Step " << s << "\n";
+    }
+
+    return 0;
+}

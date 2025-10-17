@@ -1,0 +1,62 @@
+CXX = g++
+
+CXXFLAGS = -std=c++20 -Wdeprecated-declarations -O2 -I./include
+CXXFLAGS += -DN_PARTICLES=300
+LDFLAGS = -lm
+
+UNAME_S := $(shell uname -s)
+# Platform-specific settings
+ifeq ($(UNAME_S),Linux)
+    CXXFLAGS += -DLINUX
+    # Add Linux-specific flags
+	LDFLAGS += -lglut -lGLU -lGL
+endif
+
+ifeq ($(UNAME_S),Darwin)
+    CXXFLAGS += -DMACOS
+    # Add macOS-specific flags
+    LDFLAGS += -framework OpenGL -framework GLUT
+endif
+
+SRC_DIR = src
+INC_DIR = include
+BIN_DIR = bin
+
+TARGET = $(BIN_DIR)/main
+
+# Find all source files
+SOURCES = $(wildcard $(SRC_DIR)/*.cpp)
+OBJECTS = $(SOURCES:$(SRC_DIR)/%.cpp=$(BIN_DIR)/%.o)
+
+all: $(BIN_DIR) $(TARGET)
+
+$(BIN_DIR):
+	mkdir -p $(BIN_DIR)
+
+$(TARGET): $(OBJECTS)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+	@echo "Build complete: $(TARGET)"
+
+$(BIN_DIR)/%.o: $(SRC_DIR)/%.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+.PHONY: clean
+clean:
+	rm -rf $(BIN_DIR)
+
+.PHONY: run
+run: all
+	./$(TARGET)
+
+.PHONY: debug
+debug: CXXFLAGS += -g -DDEBUG
+debug: clean all
+
+.PHONY: help
+help:
+	@echo "Available targets:"
+	@echo "  all    - Build the project (default)"
+	@echo "  clean  - Remove all build artifacts"
+	@echo "  run    - Build and run the executable"
+	@echo "  debug  - Build with debug symbols"
+	@echo "  help   - Show this help message"
