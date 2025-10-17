@@ -129,14 +129,12 @@ void NBodySimulation::computeAccelerations_()
 
 void NBodySimulation::integrate_()
 {
-    /*
     const float dt = params_.dt;
     for (auto &p : particles_)
     {
         p.velocity += p.acceleration * dt;
         p.position += p.velocity * dt;
     }
-    */
 }
 
 void NBodySimulation::step()
