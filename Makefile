@@ -1,6 +1,5 @@
 CXX = g++
-CXXFLAGS = -std=c++20 -Wall -O2 -I./include
-CXXFLAGS += -DN_PARTICLES=300
+CXXFLAGS = -std=c++20 -Wall -O0 -I./include
 
 UNAME_S := $(shell uname -s)
 
