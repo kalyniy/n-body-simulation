@@ -15,6 +15,14 @@ struct vector3_t
         return result;
     }
 
+    vector3_t &operator-=(const vector3_t &other)
+    {
+        x -= other.x;
+        y -= other.y;
+        z -= other.z;
+        return *this;
+    }
+
     vector3_t operator*(float multiplier) const
     {
         vector3_t result = {0};

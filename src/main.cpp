@@ -11,16 +11,151 @@
 #include "DatasetLoader.h"
 #include <sys/time.h>
 
-int WORLD_WIDTH = 300;
-int WORLD_HEIGHT = 300;
-int WORLD_DEPTH = 300;
+int WORLD_WIDTH = 300 * 2;
+int WORLD_HEIGHT = 300 * 2;
+int WORLD_DEPTH = 300 * 2;
 
 float MIN = 0.0001f;
-
-float G = 6.674e-11f;
-float dt = 0.01f;
+float G = 1.0f; // Simulation gravitational constant
+float dt = 0.05f;
 
 std::vector<particle_t> *g_particles = nullptr;
+
+void setupSolarSystem(std::vector<particle_t> *particles)
+{
+    // Clear any existing particles
+    particles->clear();
+    particles->resize(9);
+
+    // Sun at center - make it much more massive for simulation
+    auto &sun = particles->at(0);
+    sun.mass = 1000.0f; // Increased mass for better gravitational effect
+    sun.position.x = WORLD_WIDTH / 2.0f;
+    sun.position.y = WORLD_HEIGHT / 2.0f;
+    sun.position.z = WORLD_DEPTH / 2.0f;
+    sun.velocity.x = 0.0f;
+    sun.velocity.y = 0.0f;
+    sun.velocity.z = 0.0f;
+
+    // Mercury
+    auto &mercury = particles->at(1);
+    mercury.mass = 0.01f; // Scaled masses for simulation
+    mercury.position.x = sun.position.x + 60.0f;
+    mercury.position.y = sun.position.y;
+    mercury.position.z = sun.position.z;
+    mercury.velocity.x = 0.0f;
+    mercury.velocity.y = 1.2f; // Reduced velocities
+    mercury.velocity.z = 0.0f;
+
+    // Venus
+    auto &venus = particles->at(2);
+    venus.mass = 0.02f;
+    venus.position.x = sun.position.x + 90.0f;
+    venus.position.y = sun.position.y;
+    venus.position.z = sun.position.z;
+    venus.velocity.x = 0.0f;
+    venus.velocity.y = 1.0f;
+    venus.velocity.z = 0.0f;
+
+    // Earth
+    auto &earth = particles->at(3);
+    earth.mass = 0.02f;
+    earth.position.x = sun.position.x + 120.0f;
+    earth.position.y = sun.position.y;
+    earth.position.z = sun.position.z;
+    earth.velocity.x = 0.0f;
+    earth.velocity.y = 0.9f;
+    earth.velocity.z = 0.0f;
+
+    // Mars
+    auto &mars = particles->at(4);
+    mars.mass = 0.015f;
+    mars.position.x = sun.position.x + 160.0f;
+    mars.position.y = sun.position.y;
+    mars.position.z = sun.position.z;
+    mars.velocity.x = 0.0f;
+    mars.velocity.y = 0.75f;
+    mars.velocity.z = 0.0f;
+
+    // Jupiter
+    auto &jupiter = particles->at(5);
+    jupiter.mass = 0.5f; // Much more massive
+    jupiter.position.x = sun.position.x + 220.0f;
+    jupiter.position.y = sun.position.y;
+    jupiter.position.z = sun.position.z;
+    jupiter.velocity.x = 0.0f;
+    jupiter.velocity.y = 0.6f;
+    jupiter.velocity.z = 0.0f;
+
+    // Saturn
+    auto &saturn = particles->at(6);
+    saturn.mass = 0.3f;
+    saturn.position.x = sun.position.x + 280.0f;
+    saturn.position.y = sun.position.y;
+    saturn.position.z = sun.position.z;
+    saturn.velocity.x = 0.0f;
+    saturn.velocity.y = 0.5f;
+    saturn.velocity.z = 0.0f;
+
+    // Uranus
+    auto &uranus = particles->at(7);
+    uranus.mass = 0.1f;
+    uranus.position.x = sun.position.x;
+    uranus.position.y = sun.position.y + 200.0f; // Different axis
+    uranus.position.z = sun.position.z;
+    uranus.velocity.x = 0.45f; // Velocity in x direction
+    uranus.velocity.y = 0.0f;
+    uranus.velocity.z = 0.0f;
+
+    // Neptune
+    auto &neptune = particles->at(8);
+    neptune.mass = 0.1f;
+    neptune.position.x = sun.position.x;
+    neptune.position.y = sun.position.y - 240.0f; // Opposite side
+    neptune.position.z = sun.position.z;
+    neptune.velocity.x = -0.4f; // Velocity in negative x direction
+    neptune.velocity.y = 0.0f;
+    neptune.velocity.z = 0.0f;
+
+    // Add some z-axis variation
+    mercury.position.z += 10.0f;
+    venus.position.z -= 5.0f;
+    mars.position.z += 15.0f;
+    jupiter.position.z -= 8.0f;
+    saturn.position.z += 12.0f;
+    uranus.position.z -= 15.0f;
+    neptune.position.z += 8.0f;
+
+    auto set_circular_xy = [&](particle_t &body, const particle_t &sun)
+    {
+        // Radial vector in the XY plane (ignore z so we keep your small inclination)
+        float rx = body.position.x - sun.position.x;
+        float ry = body.position.y - sun.position.y;
+        float r = std::sqrt(rx * rx + ry * ry);
+        if (r < 1e-6f)
+            return;
+
+        // Circular speed: v = sqrt(G * M_sun / r)
+        float v = std::sqrt(G * sun.mass / r);
+
+        // Tangential unit vector (radial rotated +90° in XY)
+        float tx = -ry / r;
+        float ty = rx / r;
+
+        body.velocity.x = tx * v;
+        body.velocity.y = ty * v;
+        body.velocity.z = 0.0f; // keep in-plane; your z position offset gives a tilt
+    };
+
+    set_circular_xy(mercury, sun);
+    set_circular_xy(venus, sun);
+    set_circular_xy(earth, sun);
+    set_circular_xy(mars, sun);
+    set_circular_xy(jupiter, sun);
+    set_circular_xy(saturn, sun);
+    set_circular_xy(uranus, sun);
+    set_circular_xy(neptune, sun);
+}
 
 float randomFloat(int min, int max)
 {
@@ -49,6 +184,31 @@ void generateRandomParticles(std::vector<particle_t> *particles, size_t n)
     }
 }
 
+void computeAccelerations(std::vector<particle_t> *particles)
+{
+    const float eps2 = 0.0f; // or small softening like 1e-3f if you ever get close passes
+    size_t n = particles->size();
+    for (size_t i = 0; i < n; ++i)
+        particles->at(i).acceleration = {0, 0, 0};
+
+    for (size_t i = 0; i < n; ++i)
+    {
+        for (size_t j = i + 1; j < n; ++j)
+        {
+            auto &a = particles->at(i), &b = particles->at(j);
+            auto r = b.position - a.position;
+            float r2 = r.x * r.x + r.y * r.y + r.z * r.z + eps2;
+            float inv_r = 1.0f / std::sqrt(r2);
+            float inv_r3 = inv_r * inv_r * inv_r;
+            float s = G * inv_r3;
+            // Force per unit mass
+            auto acc = r * s;
+            a.acceleration += acc * b.mass;
+            b.acceleration -= acc * a.mass;
+        }
+    }
+}
+
 void update(std::vector<particle_t> *particles)
 {
     auto size = particles->size();
@@ -62,60 +222,37 @@ void update(std::vector<particle_t> *particles)
     // Calculate forces between all particle pairs
     for (size_t i = 0; i < size; i++)
     {
-        for (size_t j = i + 1; j < size; j++) // Avoid double calculation and self-interaction
+        for (size_t j = i + 1; j < size; j++)
         {
-            auto &particle1 = particles->at(i); // Reference to actual particle
-            auto &particle2 = particles->at(j); // Reference to actual particle
+            auto &particle1 = particles->at(i);
+            auto &particle2 = particles->at(j);
 
             auto r = particle2.position - particle1.position;
-
-            // Calculate distance (including z component!)
             auto mag_sq = (r.x * r.x) + (r.y * r.y) + (r.z * r.z);
             auto mag = std::sqrt(mag_sq);
 
-            if (mag > MIN) // Avoid division by zero
+            if (mag > MIN)
             {
-                // Gravitational force magnitude: F = G * m1 * m2 / r^2
                 float force_mag = G * particle1.mass * particle2.mass / std::max(mag_sq, MIN);
-
-                // Unit vector from particle1 to particle2
                 auto unit_r = r * (1.0f / mag);
-
-                // Force vector
                 auto force = unit_r * force_mag;
 
-                // Apply Newton's second law: F = ma, so a = F/m
                 particle1.acceleration += force * (1.0f / particle1.mass);
-                particle2.acceleration += force * (-1.0f / particle2.mass); // Equal and opposite
+                particle2.acceleration += force * (-1.0f / particle2.mass);
             }
         }
     }
 
-    // Update velocities and positions using Euler integration
+    // Update velocities and positions
     for (size_t i = 0; i < size; i++)
     {
         auto &particle = particles->at(i);
 
-        // v = v + a * dt
         particle.velocity += particle.acceleration * dt;
-
-        // x = x + v * dt
         particle.position += particle.velocity * dt;
 
-        // Optional: Apply boundary conditions (wrap around or bounce)
-        // This prevents particles from flying off to infinity
-        if (particle.position.x < 0)
-            particle.position.x += WORLD_WIDTH;
-        if (particle.position.x > WORLD_WIDTH)
-            particle.position.x -= WORLD_WIDTH;
-        if (particle.position.y < 0)
-            particle.position.y += WORLD_HEIGHT;
-        if (particle.position.y > WORLD_HEIGHT)
-            particle.position.y -= WORLD_HEIGHT;
-        if (particle.position.z < 0)
-            particle.position.z += WORLD_DEPTH;
-        if (particle.position.z > WORLD_DEPTH)
-            particle.position.z -= WORLD_DEPTH;
+        // NO BOUNDARY WRAPPING for solar system simulation
+        // Let planets orbit freely without artificial boundaries
     }
 }
 
@@ -127,7 +264,7 @@ double calculate_elapsed_time(struct timeval start, struct timeval stop)
 #pragma region OpenGl setup
 
 // Camera controls
-float camera_distance = 500.0f;
+float camera_distance = 800.0f;
 float camera_angle_x = 0.0f;
 float camera_angle_y = 0.0f;
 int mouse_x, mouse_y;
@@ -147,8 +284,9 @@ void drawParticle(const particle_t &particle)
                  particle.position.z - WORLD_DEPTH / 2);
 
     // Color based on mass (heavier = redder, lighter = bluer)
-    float mass_normalized = std::min(particle.mass / 1000.0f, 1.0f);
-    glColor3f(mass_normalized, 0.5f, 1.0f - mass_normalized);
+    // float mass_normalized = std::min(particle.mass / 1000.0f, 1.0f);
+    // glColor3f(mass_normalized, 0.5f, 1.0f - mass_normalized);
+    glColor3f(1.0f, 0.5f, 1.0f - 1.0f);
 
     // Size based on mass
     // float radius = std::max(1.0f, std::sqrt(particle.mass) * 0.1f);
@@ -408,12 +546,15 @@ int main(int argc, char **argv)
 #ifdef N_PARTICLES
         n = N_PARTICLES;
 #endif
-
+        /*
         printf("Generating %lu particles randomly...\n", n);
 
         generateRandomParticles(g_particles, n);
 
         printf("Finished generating %lu particles.\n", n);
+        */
+
+        setupSolarSystem(g_particles);
 
         /*
         double avg = 0.0;
