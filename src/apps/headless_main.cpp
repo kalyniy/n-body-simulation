@@ -63,12 +63,12 @@ int main(int argc, char **argv)
         sim.setupSolarSystem(600, 600, 600);
     }
 
-    PerformanceLogger logger(out);
+    PerformanceLogger logger(out, RunMode::Run);
     if (!logger.ok())
         std::cerr << "Warning: could not open output log: " << out << "\n";
 
     size_t log_step_size = 100;
-    size_t sizes[] = {100, 1000, 2000, /*5000, 10000*/};
+    size_t sizes[] = {100, 1000, 2000, 5000, 10000};
     size_t sizes_count = sizeof(sizes) / sizeof(sizes[0]);
 
     for (size_t i = 0; i < sizes_count; i++)
@@ -77,15 +77,15 @@ int main(int argc, char **argv)
         std::cout << "Generating " << n_particles << " random particles\n";
 
         sim.generateRandom(n_particles, 600, 600, 600);
-        
+
         auto simulation_start = std::chrono::high_resolution_clock::now();
 
         for (size_t step = 0; step < steps; step++)
         {
-            auto t0 = std::chrono::high_resolution_clock::now();
+            // auto t0 = std::chrono::high_resolution_clock::now();
             sim.step();
-            auto t1 = std::chrono::high_resolution_clock::now();
-            double dt = std::chrono::duration<double>(t1 - t0).count();
+            // auto t1 = std::chrono::high_resolution_clock::now();
+            // double dt = std::chrono::duration<double>(t1 - t0).count();
 
             if ((step % log_step_size) == 0)
                 std::cout << "Step " << step << "\n";
