@@ -91,7 +91,6 @@ void reset()
 
 /**
  * @brief Computes Accelerations in O(n^2).
- * @brief 20 floating operations
  */
 void NBodySimulation::computeAccelerations_()
 {
@@ -105,22 +104,19 @@ void NBodySimulation::computeAccelerations_()
     for (size_t i = 0; i < n; ++i)
     {
         particle_t &a = particles_[i];
-        auto massA = a.mass;
 
-        // vector3_t acc_i = {0, 0, 0}; // Accumulator for particle i
         for (size_t j = i + 1; j < n; ++j)
         {
             particle_t &b = particles_[j];
-            auto massB = b.mass;
             vector3_t r = b.position - a.position;
             float r2 = r.x * r.x + r.y * r.y + r.z * r.z + eps2;
 
-            float inv_r = 1.0f / sqrt(r2); // std::sqrt(r2);
+            float inv_r = 1.0f / std::sqrt(r2);
             float inv_r3 = inv_r * inv_r * inv_r;
 
             vector3_t acc = r * (G * inv_r3);
-            auto a_acc_d = acc * b.mass;
-            auto b_acc_d = acc * a.mass;
+            vector3_t a_acc_d = acc * b.mass;
+            vector3_t b_acc_d = acc * a.mass;
             a.acceleration += a_acc_d;
             b.acceleration -= b_acc_d;
         }

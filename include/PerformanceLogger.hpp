@@ -21,11 +21,29 @@ public:
         if (fp_)
             std::fclose(fp_);
     }
-
-    void log(size_t N, double update_sec, double gflops = 0.0, const char *note = "")
+    
+    long long calculate_total_number_of_flops_per_step(size_t n_particles)
     {
+        long long n = (long long)n_particles;
+        
+        return (29LL*(n*n) - 5LL*n)/2;
+    }
+
+    void log(size_t n_particles, size_t n_steps, double total_time) /*size_t N, double update_sec, double gflops = 0.0, const char *note = ""*/
+    {
+        constexpr size_t giga = 1024*1024*1024;
+
+        long long operations_count = calculate_total_number_of_flops_per_step(n_particles);
+        printf("Total operations per step: %lld\n", operations_count);;
+
+        double flops = (double)operations_count/total_time;
+
+        auto gflops = flops / giga;
+
         if (fp_)
-            std::fprintf(fp_, "%6zu %12.6f %14.2f %15s\n", N, update_sec, gflops, note);
+        {
+            std::fprintf(fp_, "%6zu %6zu %12.6lf %14.2lf\n", n_particles, n_steps, total_time, gflops);
+        }
     }
 
     bool ok() const { return fp_ != nullptr; }
