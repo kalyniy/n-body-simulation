@@ -2,19 +2,15 @@
 #include <cstddef>
 #include <vector>
 #include <string>
+#include <memory>
 #include "Particle.hpp"
-
-struct SimParams
-{
-    float G = 1.0f;
-    float dt = 0.05f;
-    float min_r2 = 1e-8f; // softening
-};
+#include "SimulationAlgorithm.h"
 
 class NBodySimulation
 {
 public:
-    explicit NBodySimulation(SimParams params = {}) : params_(params) {}
+    explicit NBodySimulation(std::unique_ptr<SimulationAlgorithm> algorithm, SimParams params = {})
+        : algorithm_(std::move(algorithm)), params_(params) {}
 
     std::vector<particle_t> &particles() { return particles_; }
     const std::vector<particle_t> &particles() const { return particles_; }
@@ -33,13 +29,12 @@ public:
     // Config
     void setG(float g) { params_.G = g; }
     void setDt(float d) { params_.dt = d; }
+    void setAlgorithm(std::unique_ptr<SimulationAlgorithm> algorithm) { algorithm_ = std::move(algorithm); }
+
     const SimParams &params() const { return params_; }
 
 private:
-    void computeAccelerations_();
-    void integrate_();
-
-private:
+    std::unique_ptr<SimulationAlgorithm> algorithm_;
     SimParams params_{};
     std::vector<particle_t> particles_;
 };

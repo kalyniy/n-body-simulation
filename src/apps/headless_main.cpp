@@ -2,13 +2,15 @@
 #include <iostream>
 #include "Simulation.h"
 #include "PerformanceLogger.hpp"
+#include "NaiveSimulation.h"
 
 int main(int argc, char **argv)
 {
     SimParams params;
     params.G = 1.0f;
     params.dt = 0.05f;
-    NBodySimulation sim(params);
+
+    NBodySimulation sim = NBodySimulation(std::make_unique<NaiveSimulation>(), params);
 
     // Basic CLI: headless_main [--hacc DIR] [--solar] [--random N] [--steps S] [--out file]
     std::string out = "output.txt";

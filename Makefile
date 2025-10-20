@@ -24,7 +24,9 @@ BIN_DIR = bin
 CORE_SOURCES = \
     $(SRC_DIR)/DatasetLoader.cpp \
     $(SRC_DIR)/Simulation.cpp \
-    $(SRC_DIR)/PerformanceLogger.cpp
+    $(SRC_DIR)/PerformanceLogger.cpp \
+    $(SRC_DIR)/NaiveSimulation.cpp # \
+    #$(SRC_DIR)/BarnesHutSimulation.cpp
 
 CORE_OBJECTS = $(CORE_SOURCES:$(SRC_DIR)/%.cpp=$(BIN_DIR)/%.o)
 

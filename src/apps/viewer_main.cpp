@@ -1,12 +1,14 @@
 #include "Simulation.h"
 #include "renderers/GlutRenderer.h"
+#include "NaiveSimulation.h"
 
 int main(int argc, char **argv)
 {
     SimParams params;
     params.G = 1.0f;
     params.dt = 0.05f;
-    NBodySimulation sim(params);
+    
+    NBodySimulation sim = NBodySimulation(std::make_unique<NaiveSimulation>(), params);
 
     // Simple choices: default = solar system; pass a folder to load HACC
     if (argc > 1)

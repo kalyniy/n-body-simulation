@@ -64,7 +64,7 @@ void NBodySimulation::setupSolarSystem(int W, int H, int D)
     set_body(8, 0.f, +8.f);
     particles_[8].position = {sun.position.x, sun.position.y - 240.f, sun.position.z + 8.f};
     particles_[8].mass = 0.1f;
-
+    
     auto set_circular_xy = [&](particle_t &body, const particle_t &s)
     {
         float rx = body.position.x - s.position.x;
@@ -81,60 +81,7 @@ void NBodySimulation::setupSolarSystem(int W, int H, int D)
         set_circular_xy(particles_[i], sun);
 }
 
-/**
- * @brief Resets
- *
- */
-void reset()
-{
-}
-
-/**
- * @brief Computes Accelerations in O(n^2).
- */
-void NBodySimulation::computeAccelerations_()
-{
-    const float eps2 = params_.min_r2;
-    const float G = params_.G;
-    const size_t n = particles_.size();
-
-    for (auto &p : particles_)
-        p.acceleration = {0, 0, 0};
-
-    for (size_t i = 0; i < n; ++i)
-    {
-        particle_t &a = particles_[i];
-
-        for (size_t j = i + 1; j < n; ++j)
-        {
-            particle_t &b = particles_[j];
-            vector3_t r = b.position - a.position;
-            float r2 = r.x * r.x + r.y * r.y + r.z * r.z + eps2;
-
-            float inv_r = 1.0f / std::sqrt(r2);
-            float inv_r3 = inv_r * inv_r * inv_r;
-
-            vector3_t acc = r * (G * inv_r3);
-            vector3_t a_acc_d = acc * b.mass;
-            vector3_t b_acc_d = acc * a.mass;
-            a.acceleration += a_acc_d;
-            b.acceleration -= b_acc_d;
-        }
-    }
-}
-
-void NBodySimulation::integrate_()
-{
-    const float dt = params_.dt;
-    for (auto &p : particles_)
-    {
-        p.velocity += p.acceleration * dt;
-        p.position += p.velocity * dt;
-    }
-}
-
 void NBodySimulation::step()
 {
-    computeAccelerations_();
-    integrate_();
+    algorithm_->computeStep(particles_, params_);
 }
