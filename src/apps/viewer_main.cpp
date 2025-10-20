@@ -8,10 +8,11 @@ int main(int argc, char **argv)
 {
     SimParams params;
     params.G = 1.0f;
-    params.dt = 0.05f;
+    params.dt = 0.5f;        // Smaller timestep for stability!
+    params.min_r2 = 2.0f;     // Slightly larger softening
     
     //NBodySimulation sim = NBodySimulation(std::make_unique<NaiveSimulation>(), params);
-    NBodySimulation sim = NBodySimulation(std::make_unique<BarnesHutSimulation>(0.5f), params);
+    NBodySimulation sim = NBodySimulation(std::make_unique<BarnesHutSimulation>(0.5f, 8, 16), params);
     
     // Simple choices: default = solar system; pass a folder to load HACC
     if (argc > 1)
@@ -20,7 +21,7 @@ int main(int argc, char **argv)
     }
     else
     {
-        sim.generateRandom(100000, WORLD_WIDTH, WORLD_HEIGHT, WORLD_DEPTH, 1.0f, 1.0f);
+        sim.generateRandom(10000, WORLD_WIDTH, WORLD_HEIGHT, WORLD_DEPTH, 1.0f, 1.0f);
         //sim.setupSolarSystem(WORLD_WIDTH, WORLD_HEIGHT, WORLD_DEPTH);
     }
 

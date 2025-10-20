@@ -1,7 +1,10 @@
 #include "renderers/GlutRenderer.h"
 #include "Simulation.h"
+#include "Utils.hpp"
 #include <iostream>
 #include <algorithm>
+#include <time.h>
+#include <sys/time.h>
 
 GlutRenderer *GlutRenderer::instance_ = nullptr;
 
@@ -94,15 +97,17 @@ void GlutRenderer::sIdle()
 
 void GlutRenderer::display_()
 {
+    struct timeval start, end;
     const auto& render_particles = simulation_->getRenderBuffer();
+    gettimeofday(&start, 0);
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
-
+    
     glTranslatef(0.f, 0.f, -camera_distance_);
     glRotatef(camera_angle_x_, 1.f, 0.f, 0.f);
     glRotatef(camera_angle_y_, 0.f, 1.f, 0.f);
-
+    
     // draw particles
     if (!render_particles.empty())
     {
@@ -115,8 +120,12 @@ void GlutRenderer::display_()
             glPopMatrix();
         }
     }
-
+    
     glutSwapBuffers();
+    gettimeofday(&end, 0);
+
+    double time = calculate_elapsed_time(start, end);
+    printf("Rendered image in %lf time\n", time);
 }
 
 void GlutRenderer::reshape_(int w, int h)

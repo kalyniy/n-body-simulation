@@ -21,7 +21,7 @@ class GlutRenderer : public Renderer
 public:
     using StepFn = std::function<void()>; // called each idle frame to advance sim
 
-    GlutRenderer(int *pargc, char **argv, int w = 800, int h = 600);
+    GlutRenderer(int *pargc, char **argv, int w, int h);
     ~GlutRenderer() override = default;
 
     //void attachParticles(const std::vector<particle_t> *particles);

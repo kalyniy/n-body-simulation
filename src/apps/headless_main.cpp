@@ -10,9 +10,10 @@ int main(int argc, char **argv)
 {
     SimParams params;
     params.G = 1.0f;
-    params.dt = 0.05f;
+    params.dt = 0.5f;        // Smaller timestep for stability!
+    params.min_r2 = 2.0f;     // Slightly larger softening
 
-    NBodySimulation sim = NBodySimulation(std::make_unique<BarnesHutSimulation>(0.8f), params);
+    NBodySimulation sim = NBodySimulation(std::make_unique<BarnesHutSimulation>(0.8f, 8, 16), params);
 
     // Basic CLI: headless_main [--hacc DIR] [--solar] [--random N] [--steps S] [--out file]
     std::string out = "output.txt";
