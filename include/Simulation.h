@@ -3,6 +3,8 @@
 #include <vector>
 #include <string>
 #include <memory>
+#include <atomic>
+#include <mutex>
 #include "Particle.hpp"
 #include "SimulationAlgorithm.h"
 
@@ -17,7 +19,7 @@ public:
 
     void clear();
     void reserve(std::size_t n);
-    void setupSolarSystem(int worldX = 600, int worldY = 600, int worldZ = 600);
+    void setupSolarSystem(int worldX, int worldY, int worldZ);
     void generateRandom(std::size_t n, int worldX, int worldY, int worldZ, float minMass = 1.f, float maxMass = 1000.f);
 
     // I/O / datasets
@@ -25,6 +27,7 @@ public:
 
     // One physics step (no rendering)
     void step();
+    const std::vector<particle_t>& getRenderBuffer();
 
     // Config
     void setG(float g) { params_.G = g; }
@@ -37,4 +40,7 @@ private:
     std::unique_ptr<SimulationAlgorithm> algorithm_;
     SimParams params_{};
     std::vector<particle_t> particles_;
+    std::vector<particle_t> render_buffer_;  // double buffer for rendering
+    std::atomic<bool> buffer_ready_{false};
+    std::mutex buffer_mutex_;
 };

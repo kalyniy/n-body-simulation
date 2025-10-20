@@ -2,6 +2,7 @@
 #include "renderers/GlutRenderer.h"
 #include "NaiveSimulation.h"
 #include "BarnesHutSimulation.h"
+#include "World.h"
 
 int main(int argc, char **argv)
 {
@@ -19,12 +20,14 @@ int main(int argc, char **argv)
     }
     else
     {
-        sim.generateRandom(10000, 600, 600, 600, 1.0f, 1.0f);
-        //sim.setupSolarSystem(600, 600, 600);
+        sim.generateRandom(100000, WORLD_WIDTH, WORLD_HEIGHT, WORLD_DEPTH, 1.0f, 1.0f);
+        //sim.setupSolarSystem(WORLD_WIDTH, WORLD_HEIGHT, WORLD_DEPTH);
     }
 
-    GlutRenderer renderer(&argc, argv, 1280, 800);
-    renderer.attachParticles(&sim.particles());
+    GlutRenderer renderer(&argc, argv, 1920, 1080);
+    //renderer.attachParticles(&sim.particles());
+    renderer.attachSimulation(&sim);
+
     renderer.onStep([&]()
                     { sim.step(); });
 

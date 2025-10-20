@@ -13,8 +13,8 @@
 #include <vector>
 #include <functional>
 #include "Renderer.h"
-#include "Particle.hpp"
-
+//#include "Particle.hpp"
+#include "Simulation.h"
 // Minimal GLUT renderer that can "drive" a simulation via a callback.
 class GlutRenderer : public Renderer
 {
@@ -24,7 +24,8 @@ public:
     GlutRenderer(int *pargc, char **argv, int w = 800, int h = 600);
     ~GlutRenderer() override = default;
 
-    void attachParticles(const std::vector<particle_t> *particles);
+    //void attachParticles(const std::vector<particle_t> *particles);
+    void attachSimulation(NBodySimulation* sim);
     void onStep(StepFn fn); // optional: sim->step() provided from app
 
     void draw(const std::vector<particle_t> &particles) override; // not used directly
@@ -48,7 +49,8 @@ private:
     void idle_();
 
 private:
-    const std::vector<particle_t> *particles_ = nullptr;
+    NBodySimulation* simulation_ = nullptr; 
+    //const std::vector<particle_t> *particles_ = nullptr;
     StepFn step_fn_{};
 
     float camera_distance_ = 800.f;

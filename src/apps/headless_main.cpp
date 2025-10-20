@@ -3,6 +3,8 @@
 #include "Simulation.h"
 #include "PerformanceLogger.hpp"
 #include "NaiveSimulation.h"
+#include "BarnesHutSimulation.h"
+#include "World.h"
 
 int main(int argc, char **argv)
 {
@@ -10,7 +12,7 @@ int main(int argc, char **argv)
     params.G = 1.0f;
     params.dt = 0.05f;
 
-    NBodySimulation sim = NBodySimulation(std::make_unique<NaiveSimulation>(), params);
+    NBodySimulation sim = NBodySimulation(std::make_unique<BarnesHutSimulation>(0.8f), params);
 
     // Basic CLI: headless_main [--hacc DIR] [--solar] [--random N] [--steps S] [--out file]
     std::string out = "output.txt";
@@ -56,13 +58,13 @@ int main(int argc, char **argv)
     }
     else if (randomN > 0)
     {
-        // std::cout << "Generating " << randomN << " random particles\n";
-        // sim.generateRandom(randomN, 600, 600, 600);
+        std::cout << "Generating " << randomN << " random particles\n";
+        sim.generateRandom(randomN, WORLD_WIDTH, WORLD_HEIGHT, WORLD_DEPTH);
     }
     else if (use_solar)
     {
         std::cout << "Setting up solar system\n";
-        sim.setupSolarSystem(600, 600, 600);
+        sim.setupSolarSystem(WORLD_WIDTH, WORLD_HEIGHT, WORLD_DEPTH);
     }
 
     PerformanceLogger logger(out, RunMode::Run);
@@ -73,12 +75,12 @@ int main(int argc, char **argv)
     size_t sizes[] = {100, 1000, 2000, 5000, 10000};
     size_t sizes_count = sizeof(sizes) / sizeof(sizes[0]);
 
-    for (size_t i = 0; i < sizes_count; i++)
-    {
-        const size_t n_particles = sizes[i];
+    //for (size_t i = 0; i < sizes_count; i++)
+    //{
+        const size_t n_particles = randomN; //sizes[i];
         std::cout << "Generating " << n_particles << " random particles\n";
 
-        sim.generateRandom(n_particles, 600, 600, 600);
+        //sim.generateRandom(n_particles, WORLD_WIDTH, WORLD_HEIGHT, WORLD_DEPTH);
 
         auto simulation_start = std::chrono::high_resolution_clock::now();
 
@@ -98,7 +100,7 @@ int main(int argc, char **argv)
         double simulation_time = std::chrono::duration<double>(simulation_end - simulation_start).count();
 
         logger.log(n_particles, steps, simulation_time);
-    }
+    //}
 
     return 0;
 }

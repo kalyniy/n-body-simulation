@@ -3,6 +3,7 @@
 #include <random>
 #include <algorithm>
 #include <cmath>
+#include <iostream>
 
 void NBodySimulation::clear() { particles_.clear(); }
 void NBodySimulation::reserve(std::size_t n) { particles_.reserve(n); }
@@ -84,4 +85,16 @@ void NBodySimulation::setupSolarSystem(int W, int H, int D)
 void NBodySimulation::step()
 {
     algorithm_->computeStep(particles_, params_);
+    std::cout << "computed step.\n";
+    {
+        std::lock_guard<std::mutex> lock(buffer_mutex_);
+        render_buffer_ = particles_;  // or use std::swap
+        buffer_ready_ = true;
+    }
+}
+
+const std::vector<particle_t>& NBodySimulation::getRenderBuffer() 
+{
+    std::lock_guard<std::mutex> lock(buffer_mutex_);
+    return render_buffer_;
 }

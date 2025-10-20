@@ -1,4 +1,5 @@
 #include "renderers/GlutRenderer.h"
+#include "Simulation.h"
 #include <iostream>
 #include <algorithm>
 
@@ -40,7 +41,13 @@ GlutRenderer::GlutRenderer(int *pargc, char **argv, int w, int h)
               << "  ESC: quit\n";
 }
 
-void GlutRenderer::attachParticles(const std::vector<particle_t> *p) { particles_ = p; }
+//void GlutRenderer::attachParticles(const std::vector<particle_t> *p) { particles_ = p; }
+
+void GlutRenderer::attachSimulation(NBodySimulation* sim)
+{
+    simulation_ = sim;
+}
+
 void GlutRenderer::onStep(StepFn fn) { step_fn_ = std::move(fn); }
 
 void GlutRenderer::processEvents()
@@ -87,6 +94,8 @@ void GlutRenderer::sIdle()
 
 void GlutRenderer::display_()
 {
+    const auto& render_particles = simulation_->getRenderBuffer();
+
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
 
@@ -95,9 +104,9 @@ void GlutRenderer::display_()
     glRotatef(camera_angle_y_, 0.f, 1.f, 0.f);
 
     // draw particles
-    if (particles_)
+    if (!render_particles.empty())
     {
-        for (const auto &p : *particles_)
+        for (const auto &p : render_particles)
         {
             glPushMatrix();
             glTranslatef(p.position.x, p.position.y, p.position.z);

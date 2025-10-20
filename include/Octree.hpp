@@ -137,8 +137,8 @@ private:
         // Handle degenerate cases (all particles same pos)
         if (!(half > 0.0f)) half = 1.0f;
 
-        half += bp_.bounds_pad; // small padding for inclusive splitting
-
+        //half += bp_.bounds_pad; // small padding for inclusive splitting
+        half *= (1.0f + bp_.bounds_pad);
         return {center, half};
     }
 
@@ -228,7 +228,8 @@ private:
 
         // Vector from particle to node COM
         vector3_t r = { n.com.x - pi.x, n.com.y - pi.y, n.com.z - pi.z };
-        float r2 = r.x * r.x + r.y * r.y + r.z * r.z + eps2;
+        float r2_true = r.x * r.x + r.y * r.y + r.z * r.z;
+        //float r2 = r.x * r.x + r.y * r.y + r.z * r.z + eps2;
 
         // If leaf, sum direct interactions with contained particles (skip self)
         if (n.leaf) {
@@ -249,9 +250,10 @@ private:
 
         // Opening criterion: if (s / d) < theta, use monopole approximation
         const float s = n.box.half * 2.0f;      // node width
-        const float d = std::sqrt(r2);          // distance to COM (softened)
+        float d = std::sqrt(r2_true);           // distance to COM (softened)
         if ((s / d) < theta) {
-            float inv_r = 1.0f / d;
+            float r2_soft = r2_true + eps2;
+            float inv_r = 1.0f / std::sqrt(r2_soft);
             float inv_r3 = inv_r * inv_r * inv_r;
             float sgm = G * n.mass * inv_r3;
             acc.x += r.x * sgm;
