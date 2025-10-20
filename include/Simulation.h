@@ -25,7 +25,8 @@ public:
     void generateRandom(std::size_t n, int worldX, int worldY, int worldZ, float minMass = 1.f, float maxMass = 1000.f);
     void generateGalaxyDisk(int n_particles, float radius, float thickness);
     void generateClusters(int n_clusters, int particles_per_cluster, float cluster_separation);
-
+    void generatePlummerSphere(int n_particles, float scale_radius, float total_mass = -1.0f);
+    
     // I/O / datasets
     void loadHACC(const std::string &dir);
 

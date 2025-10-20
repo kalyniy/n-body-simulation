@@ -120,6 +120,17 @@ void NBodySimulation::generateGalaxyDisk(int n_particles, float radius, float th
         p.mass = uniformRandom(0.5f, 2.0f);
         particles_.push_back(p);
     }
+
+    float disk_volume = M_PI * radius * radius * thickness;
+    float volume_per_particle = disk_volume / n_particles;
+    float avg_spacing = std::cbrt(volume_per_particle);
+    
+    float softening = avg_spacing * 0.1f;  // 10% of spacing
+    params_.min_r2 = softening * softening;
+    
+    std::cout << "Disk: avg_spacing = " << avg_spacing 
+              << ", softening = " << softening 
+              << ", min_r2 = " << params_.min_r2 << "\n";
 }
 
 void NBodySimulation::generateClusters(int n_clusters, 
@@ -157,10 +168,96 @@ void NBodySimulation::generateClusters(int n_clusters,
     }
 }
 
+void NBodySimulation::generatePlummerSphere(int n_particles, 
+                                           float scale_radius,
+                                           float total_mass)
+{
+    particles_.clear();
+    particles_.reserve(n_particles);
+    
+    // If total_mass not specified, use 1.0 per particle
+    if (total_mass < 0.0f) {
+        total_mass = static_cast<float>(n_particles);
+    }
+    float particle_mass = total_mass / n_particles;
+    
+    // Calculate softening based on Plummer sphere density
+    // Effective radius containing ~90% of mass is about 2.4 * scale_radius
+    float effective_radius = 2.4f * scale_radius;
+    float sphere_volume = (4.0f/3.0f) * M_PI * 
+                          effective_radius * effective_radius * effective_radius;
+    float volume_per_particle = sphere_volume / n_particles;
+    float avg_spacing = std::cbrt(volume_per_particle);
+    float softening = avg_spacing * 0.15f;  // 15% for clusters
+    
+    params_.min_r2 = softening * softening;
+    
+    std::cout << "Generating Plummer Sphere:\n"
+              << "  Particles: " << n_particles << "\n"
+              << "  Scale radius: " << scale_radius << "\n"
+              << "  Total mass: " << total_mass << "\n"
+              << "  Particle mass: " << particle_mass << "\n"
+              << "  Avg spacing: " << avg_spacing << "\n"
+              << "  Softening: " << softening << " (min_r2 = " << params_.min_r2 << ")\n";
+    
+    // Generate particles
+    for (int i = 0; i < n_particles; ++i)
+    {
+        particle_t p;
+        p.mass = particle_mass;
+        
+        // ===== POSITION: Sample from Plummer density profile =====
+        // Plummer density: ρ(r) = (3M / 4πa³) × (1 + r²/a²)^(-5/2)
+        // Cumulative mass: M(r) = M × r³ / (r² + a²)^(3/2)
+        // Inverse: r = a / sqrt(u^(-2/3) - 1), where u ~ Uniform(0,1)
+        
+        float u = uniformRandom(0.0f, 1.0f);
+        float r = scale_radius / std::sqrt(std::pow(u, -2.0f/3.0f) - 1.0f);
+        
+        // Random direction on sphere
+        p.position = uniformRandomOnSphere(r);
+        
+        // ===== VELOCITY: Sample from isotropic distribution function =====
+        // For a self-consistent Plummer sphere in virial equilibrium:
+        // Escape velocity: v_esc² = 2 × Φ(r), where Φ(r) = -GM / sqrt(r² + a²)
+        // Distribution function requires rejection sampling
+        
+        float x = 0.0f;  // Ratio v / v_esc
+        float y = 0.0f;
+        
+        // Rejection sampling for velocity magnitude
+        // f(v) from Plummer's DF (Aarseth et al. 1974)
+        while (true) {
+            x = uniformRandom(0.0f, 1.0f);
+            y = uniformRandom(0.0f, 0.1f);  // Upper bound on g(x)
+            
+            float g_x = x * x * std::pow(1.0f - x * x, 3.5f);
+            
+            if (y < g_x) {
+                break;  // Accept this sample
+            }
+        }
+        
+        // Calculate escape velocity at this radius
+        float r2_plus_a2 = r * r + scale_radius * scale_radius;
+        float v_escape = std::sqrt(2.0f * params_.G * total_mass / std::sqrt(r2_plus_a2));
+        
+        // Actual velocity magnitude
+        float v = x * v_escape;
+        
+        // Random direction for velocity (isotropic)
+        p.velocity = uniformRandomOnSphere(v);
+        
+        particles_.push_back(p);
+    }
+    
+    std::cout << "Plummer sphere generated successfully!\n";
+}
+
 void NBodySimulation::step()
 {
     algorithm_->computeStep(particles_, params_);
-    std::cout << "computed step.\n";
+    //std::cout << "computed step.\n";
     {
         std::lock_guard<std::mutex> lock(buffer_mutex_);
         render_buffer_ = particles_;  // or use std::swap

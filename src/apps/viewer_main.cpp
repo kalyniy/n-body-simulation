@@ -11,18 +11,18 @@ double log_base_8(double x)
 
 int main(int argc, char **argv)
 {
-    size_t n_particles = 10000;
+    size_t n_particles = 100000;
    
     SimParams params;
     params.G = 1.0f;
-    params.dt = 0.05f; // Smaller timestep for stability!
+    params.dt = 0.5f; // Smaller timestep for stability!
     params.min_r2 = 2.0f;
     
     auto max_depth = log_base_8((double)n_particles);
     printf("Max depth: %lf\n", max_depth);
 
     //NBodySimulation sim = NBodySimulation(std::make_unique<NaiveSimulation>(), params);
-    NBodySimulation sim = NBodySimulation(std::make_unique<BarnesHutSimulation>(0.5f, 8, max_depth), params);
+    NBodySimulation sim = NBodySimulation(std::make_unique<BarnesHutSimulation>(0.8f, 8, 32), params);
     
     // Simple choices: default = solar system; pass a folder to load HACC
     if (argc > 1)
@@ -32,13 +32,19 @@ int main(int argc, char **argv)
     else
     {
         //sim.generateClusters(2, n_particles / 2, 300.0f);
-        
+        /*
         sim.generateGalaxyDisk(n_particles, 
             300.0f,   // disk radius
             50.0f     // disk thickness
         );
-        
-        //sim.generateRandom(n_particles, WORLD_WIDTH, WORLD_HEIGHT, WORLD_DEPTH, 1.0f, 1.0f);
+        */
+        /*
+        sim.generatePlummerSphere(
+            n_particles,      // 50K particles
+            200.0f//,     // Scale radius = 200 units
+        );
+        */
+        sim.generateRandom(n_particles, WORLD_WIDTH, WORLD_HEIGHT, WORLD_DEPTH, 1.0f, 1.0f);
         //sim.setupSolarSystem(WORLD_WIDTH, WORLD_HEIGHT, WORLD_DEPTH);
     }
 

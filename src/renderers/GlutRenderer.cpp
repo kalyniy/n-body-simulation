@@ -125,7 +125,7 @@ void GlutRenderer::display_()
     gettimeofday(&end, 0);
 
     double time = calculate_elapsed_time(start, end);
-    printf("Rendered image in %lf time\n", time);
+    //printf("Rendered image in %lf time\n", time);
 }
 
 void GlutRenderer::reshape_(int w, int h)
