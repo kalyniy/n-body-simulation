@@ -19,8 +19,12 @@ public:
 
     void clear();
     void reserve(std::size_t n);
+
+    // Particle Generation
     void setupSolarSystem(int worldX, int worldY, int worldZ);
     void generateRandom(std::size_t n, int worldX, int worldY, int worldZ, float minMass = 1.f, float maxMass = 1000.f);
+    void generateGalaxyDisk(int n_particles, float radius, float thickness);
+    void generateClusters(int n_clusters, int particles_per_cluster, float cluster_separation);
 
     // I/O / datasets
     void loadHACC(const std::string &dir);

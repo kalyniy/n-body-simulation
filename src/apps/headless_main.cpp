@@ -73,35 +73,30 @@ int main(int argc, char **argv)
         std::cerr << "Warning: could not open output log: " << out << "\n";
 
     size_t log_step_size = 100;
-    size_t sizes[] = {100, 1000, 2000, 5000, 10000};
-    size_t sizes_count = sizeof(sizes) / sizeof(sizes[0]);
 
-    //for (size_t i = 0; i < sizes_count; i++)
-    //{
-        const size_t n_particles = randomN; //sizes[i];
-        std::cout << "Generating " << n_particles << " random particles\n";
+    const size_t n_particles = randomN; //sizes[i];
+    std::cout << "Generating " << n_particles << " random particles\n";
 
-        //sim.generateRandom(n_particles, WORLD_WIDTH, WORLD_HEIGHT, WORLD_DEPTH);
+    //sim.generateRandom(n_particles, WORLD_WIDTH, WORLD_HEIGHT, WORLD_DEPTH);
 
-        auto simulation_start = std::chrono::high_resolution_clock::now();
+    auto simulation_start = std::chrono::high_resolution_clock::now();
 
-        for (size_t step = 0; step < steps; step++)
-        {
-            // auto t0 = std::chrono::high_resolution_clock::now();
-            sim.step();
-            // auto t1 = std::chrono::high_resolution_clock::now();
-            // double dt = std::chrono::duration<double>(t1 - t0).count();
+    for (size_t step = 0; step < steps; step++)
+    {
+        // auto t0 = std::chrono::high_resolution_clock::now();
+        sim.step();
+        // auto t1 = std::chrono::high_resolution_clock::now();
+        // double dt = std::chrono::duration<double>(t1 - t0).count();
 
-            if ((step % log_step_size) == 0)
-                std::cout << "Step " << step << "\n";
-        }
+        if ((step % log_step_size) == 0)
+            std::cout << "Step " << step << "\n";
+    }
 
-        auto simulation_end = std::chrono::high_resolution_clock::now();
+    auto simulation_end = std::chrono::high_resolution_clock::now();
 
-        double simulation_time = std::chrono::duration<double>(simulation_end - simulation_start).count();
+    double simulation_time = std::chrono::duration<double>(simulation_end - simulation_start).count();
 
-        logger.log(n_particles, steps, simulation_time);
-    //}
+    logger.log(n_particles, steps, simulation_time);
 
     return 0;
 }

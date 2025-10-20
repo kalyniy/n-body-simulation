@@ -1,5 +1,6 @@
 #include "Simulation.h"
 #include "DatasetLoader.h"
+#include "Random.hpp"
 #include <random>
 #include <algorithm>
 #include <cmath>
@@ -80,6 +81,80 @@ void NBodySimulation::setupSolarSystem(int W, int H, int D)
 
     for (int i = 1; i < 9; ++i)
         set_circular_xy(particles_[i], sun);
+}
+
+void NBodySimulation::generateGalaxyDisk(int n_particles, float radius, float thickness)
+{
+    particles_.clear();
+    particles_.reserve(n_particles);
+    
+    const float central_mass = 1000000.0f;
+    particle_t center;
+    center.position = {0, 0, 0};
+    center.velocity = {0, 0, 0};
+    center.mass = central_mass;
+    particles_.push_back(center);
+    
+    for (int i = 1; i < n_particles; ++i) {
+        particle_t p;
+        
+        float r = radius * std::sqrt(uniformRandom(0.0f, 1.0f));
+        float theta = uniformRandom(0.0f, 2.0f * M_PI);
+        float z = gaussianRandom(0.0f, thickness * 0.3f);
+        
+        p.position = {
+            r * std::cos(theta),
+            z,
+            r * std::sin(theta)
+        };
+        
+        float v_orbital = std::sqrt(params_.G * central_mass / r);
+        float v_dispersion = 0.1f * v_orbital;
+        
+        p.velocity = {
+            -v_orbital * std::sin(theta) + gaussianRandom(0.0f, v_dispersion),
+            gaussianRandom(0.0f, v_dispersion * 0.5f),
+            v_orbital * std::cos(theta) + gaussianRandom(0.0f, v_dispersion)
+        };
+        
+        p.mass = uniformRandom(0.5f, 2.0f);
+        particles_.push_back(p);
+    }
+}
+
+void NBodySimulation::generateClusters(int n_clusters, 
+                                       int particles_per_cluster,
+                                       float cluster_separation) 
+{
+    particles_.clear();
+    particles_.reserve(n_clusters * particles_per_cluster);
+    
+    for (int c = 0; c < n_clusters; ++c) {
+        float angle = (2.0f * M_PI * c) / n_clusters;
+        vector3_t cluster_center = {
+            cluster_separation * std::cos(angle),
+            uniformRandom(-50.0f, 50.0f),
+            cluster_separation * std::sin(angle)
+        };
+        
+        float speed = 5.0f;
+        vector3_t cluster_velocity = {
+            -speed * std::cos(angle),
+            0.0f,
+            -speed * std::sin(angle)
+        };
+        
+        for (int i = 0; i < particles_per_cluster; ++i) {
+            particle_t p;
+            
+            float cluster_radius = 100.0f;
+            p.position = cluster_center + gaussianRandomVec3(0.0f, cluster_radius);
+            p.velocity = cluster_velocity + gaussianRandomVec3(0.0f, 2.0f);
+            p.mass = uniformRandom(0.8f, 1.2f);
+            
+            particles_.push_back(p);
+        }
+    }
 }
 
 void NBodySimulation::step()
