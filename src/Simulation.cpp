@@ -64,7 +64,7 @@ void NBodySimulation::setupSolarSystem(int W, int H, int D)
     set_body(8, 0.f, +8.f);
     particles_[8].position = {sun.position.x, sun.position.y - 240.f, sun.position.z + 8.f};
     particles_[8].mass = 0.1f;
-    
+
     auto set_circular_xy = [&](particle_t &body, const particle_t &s)
     {
         float rx = body.position.x - s.position.x;
