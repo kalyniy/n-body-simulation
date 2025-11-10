@@ -97,10 +97,10 @@ void GlutRenderer::sIdle()
 
 void GlutRenderer::display_()
 {
-    struct timeval start, end;
+    if (!simulation_) return;
+    
     const auto& render_particles = simulation_->getRenderBuffer();
-    gettimeofday(&start, 0);
-
+    
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
     
@@ -108,7 +108,19 @@ void GlutRenderer::display_()
     glRotatef(camera_angle_x_, 1.f, 0.f, 0.f);
     glRotatef(camera_angle_y_, 0.f, 1.f, 0.f);
     
-    // draw particles
+    // Debug output
+    static int frame_count = 0;
+    if (frame_count % 60 == 0 && !render_particles.empty())
+    {
+        std::cout << "Rendering " << render_particles.size() << " particles" << std::endl;
+        std::cout << "First particle: (" 
+                  << render_particles[0].position.x << ", "
+                  << render_particles[0].position.y << ", "
+                  << render_particles[0].position.z << ")" << std::endl;
+    }
+    frame_count++;
+    
+    // Draw particles
     if (!render_particles.empty())
     {
         for (const auto &p : render_particles)
@@ -120,12 +132,12 @@ void GlutRenderer::display_()
             glPopMatrix();
         }
     }
+    else
+    {
+        std::cout << "Warning: No particles to render!" << std::endl;
+    }
     
     glutSwapBuffers();
-    gettimeofday(&end, 0);
-
-    double time = calculate_elapsed_time(start, end);
-    //printf("Rendered image in %lf time\n", time);
 }
 
 void GlutRenderer::reshape_(int w, int h)
@@ -167,7 +179,7 @@ void GlutRenderer::motion_(int x, int y)
     mouse_y_ = y;
     glutPostRedisplay();
 }
-
+/*
 void GlutRenderer::keyboard_(unsigned char key, int, int)
 {
     switch (key)
@@ -186,10 +198,39 @@ void GlutRenderer::keyboard_(unsigned char key, int, int)
         break;
     }
 }
+*/
 
 void GlutRenderer::idle_()
 {
     if (animate_ && step_fn_)
         step_fn_();
     glutPostRedisplay();
+}
+
+void GlutRenderer::keyboard_(unsigned char key, int x, int y)
+{
+    // Call custom keyboard handler first if set
+    if (keyboard_fn_)
+    {
+        keyboard_fn_(key, x, y);
+    }
+    
+    // Default controls
+    switch (key)
+    {
+    case ' ':
+        animate_ = !animate_;
+        std::cout << (animate_ ? "Playing" : "Paused") << std::endl;
+        break;
+    case 'r':
+    case 'R':
+        camera_angle_x_ = camera_angle_y_ = 0.f;
+        camera_distance_ = 800.f;
+        std::cout << "Camera reset" << std::endl;
+        break;
+    case 27: // ESC
+        should_close_ = true;
+        std::exit(0);
+        break;
+    }
 }

@@ -39,6 +39,13 @@ public:
     void setDt(float d) { params_.dt = d; }
     void setAlgorithm(std::unique_ptr<SimulationAlgorithm> algorithm) { algorithm_ = std::move(algorithm); }
 
+    void updateRenderBuffer()
+    {
+        std::lock_guard<std::mutex> lock(buffer_mutex_);
+        render_buffer_ = particles_;
+        buffer_ready_ = true;
+    }
+    
     const SimParams &params() const { return params_; }
 
 private:

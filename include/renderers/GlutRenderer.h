@@ -20,6 +20,8 @@ class GlutRenderer : public Renderer
 {
 public:
     using StepFn = std::function<void()>; // called each idle frame to advance sim
+    using KeyboardFn = std::function<void(unsigned char, int, int)>;
+    void onKeyboard(KeyboardFn fn) { keyboard_fn_ = std::move(fn); }
 
     GlutRenderer(int *pargc, char **argv, int w, int h);
     ~GlutRenderer() override = default;
@@ -52,6 +54,7 @@ private:
     NBodySimulation* simulation_ = nullptr; 
     //const std::vector<particle_t> *particles_ = nullptr;
     StepFn step_fn_{};
+    KeyboardFn keyboard_fn_{};
 
     float camera_distance_ = 800.f;
     float camera_angle_x_ = 0.f;
