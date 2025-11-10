@@ -26,7 +26,8 @@ CORE_SOURCES = \
     $(SRC_DIR)/Simulation.cpp \
     $(SRC_DIR)/PerformanceLogger.cpp \
     $(SRC_DIR)/NaiveSimulation.cpp \
-    $(SRC_DIR)/BarnesHutSimulation.cpp
+    $(SRC_DIR)/BarnesHutSimulation.cpp \
+    $(SRC_DIR)/CheckpointManager.cpp 
 
 CORE_OBJECTS = $(CORE_SOURCES:$(SRC_DIR)/%.cpp=$(BIN_DIR)/%.o)
 

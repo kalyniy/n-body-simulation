@@ -35,8 +35,8 @@ public:
     }
 
     // Method to set values
-    void setFilePath(const std::string& name) {
-        this->filePath = filePath;
+    void setFilePath(const std::string& path) {
+        this->filePath = path;
     }
 
     void write_header(SimulationOutputHeader header);
@@ -44,5 +44,5 @@ public:
     void write_step(particle_t* particles, int count);
 
     SimulationOutputHeader read_header();
-    void read_step();
+    size_t read_step(float* positions_out, size_t step_index);
 };

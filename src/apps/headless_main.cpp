@@ -95,14 +95,13 @@ int main(int argc, char **argv)
 
         MPI_Bcast((void*)data, randomN, mpi_particle_type, 0, MPI_COMM_WORLD);
         printf("Rank %d received data after bcast.\n", rank);
+        
+        /* // This code verifies that processes have the same particles
+        particle_t particle = data[0];
 
-        //if (rank != 0)
-        {
-            particle_t particle = data[0];
-
-            printf("particle[0] (mass: %f)= pos.x: %f, pos.y: %f, pos.z: %f\n", particle.mass, particle.position.x, particle.position.y, particle.position.z);
-            fflush(stdout);
-        }
+        printf("particle[0] (mass: %f)= pos.x: %f, pos.y: %f, pos.z: %f\n", particle.mass, particle.position.x, particle.position.y, particle.position.z);
+        fflush(stdout);
+        */
     }
     else if (use_solar)
     {
@@ -121,14 +120,18 @@ int main(int argc, char **argv)
 
     //sim.generateRandom(n_particles, WORLD_WIDTH, WORLD_HEIGHT, WORLD_DEPTH);
 
-    CheckpointManager* checkpointManager;
-
-    if (rank == 0)
+    // Only rank 0 handles checkpointing
+    if (rank == 0) 
     {
-        auto instance = checkpointManager->getInstance();
-
-        instance->setFilePath("data.bin");
-        //instance->write_header();
+        CheckpointManager* checkpoint = CheckpointManager::getInstance();
+        checkpoint->setFilePath("simulation_output.bin");
+        
+        // Write header at the beginning
+        SimulationOutputHeader header;
+        header.n_particles = n_particles;
+        header.target_steps = steps;
+        header.passed_steps = 0;
+        checkpoint->write_header(header);
     }
 
 
@@ -140,9 +143,14 @@ int main(int argc, char **argv)
         sim.step();
         // auto t1 = std::chrono::high_resolution_clock::now();
         // double dt = std::chrono::duration<double>(t1 - t0).count();
-
-        if ((step % log_step_size) == 0)
-            std::cout << "Step " << step << "\n";
+        if (rank == 0) {
+            CheckpointManager* checkpoint = CheckpointManager::getInstance();
+            checkpoint->write_step(sim.particles().data(), n_particles);
+            
+            if (step % log_step_size == 0) {
+                std::cout << "Step " << step << " / " << steps << " completed" << std::endl;
+            }
+        }
     }
 
     auto simulation_end = std::chrono::high_resolution_clock::now();
