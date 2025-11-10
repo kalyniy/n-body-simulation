@@ -8,15 +8,7 @@ class BarnesHutSimulation : public SimulationAlgorithm {
 public:
     explicit BarnesHutSimulation(float theta = 0.5f,
                                  int   leafBucketSize = 8,
-                                 int   maxDepth = 32)
-        : theta_(theta)
-    {
-        std::cout << "BarnesHutSimulation running\n";
-
-        bp_.bucket_size = leafBucketSize;
-        bp_.max_depth   = maxDepth;
-        bp_.bounds_pad  = 1e-2f;
-    }
+                                 int   maxDepth = 32);
 
     void setTheta(float t) { theta_ = t; }
 

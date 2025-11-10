@@ -57,3 +57,14 @@ struct particle_t
     vector3_t acceleration;
     float mass;
 };
+/*
+struct particleSoA
+{
+    std::vector<float> positions_x;
+    std::vector<float> positions_y;
+    std::vector<float> positions_z;
+    vector3_t velocity;
+    vector3_t acceleration;
+    std::vector<float> masses;
+};
+*/

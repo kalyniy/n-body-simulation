@@ -1,6 +1,15 @@
 #include "BarnesHutSimulation.h"
 #include <cmath>
 
+BarnesHutSimulation::BarnesHutSimulation(float theta, int leafBucketSize, int maxDepth)
+    : theta_(theta)
+{
+    std::cout << "BarnesHutSimulation running\n";
+
+    bp_.bucket_size = leafBucketSize;
+    bp_.max_depth   = maxDepth;
+    bp_.bounds_pad  = 1e-2f;
+}
 void BarnesHutSimulation::computeStep(std::vector<particle_t>& particles, const SimParams& params)
 {
     computeAccelerations_(particles, params);

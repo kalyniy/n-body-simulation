@@ -1,5 +1,5 @@
-CXX = g++
-CXXFLAGS = -std=c++20 -Wall -O0 -I./include
+CXX = mpic++
+CXXFLAGS = -std=c++20 -Wall -O0 -I./include -DUSE_MPI
 
 UNAME_S := $(shell uname -s)
 

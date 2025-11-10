@@ -17,6 +17,8 @@ void NBodySimulation::loadHACC(const std::string &dir)
 
 void NBodySimulation::generateRandom(std::size_t n, int W, int H, int D, float minM, float maxM)
 {
+    std::cout << "Generating " << n << " random particles\n";
+
     particles_.clear();
     particles_.reserve(n);
     std::mt19937 rng{std::random_device{}()};
