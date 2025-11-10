@@ -23,7 +23,7 @@ int main(int argc, char **argv)
     params.dt = 0.5f;
     params.min_r2 = 2.0f;
 
-    NBodySimulation sim = NBodySimulation(std::make_unique<NaiveSimulation>(), params);
+    NBodySimulation sim = NBodySimulation(std::make_unique<BarnesHutSimulation>(), params);
 
     std::string out = "output.txt";
     std::string hacc_dir;
