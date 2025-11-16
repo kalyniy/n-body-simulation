@@ -7,23 +7,37 @@
 #include "BarnesHutSimulation.h"
 #include "World.h"
 #include "CheckpointManager.h"
+
+#ifdef USE_MPI
 #include <mpi.h>
+#include "MpiNaiveSimulation.h"
+#endif
 
 int main(int argc, char **argv)
 {
+    #ifdef USE_MPI
     int processes_count;
     int rank;
 
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &processes_count);
+    #endif
 
     SimParams params;
     params.G = 1.0f;
     params.dt = 0.5f;
     params.min_r2 = 2.0f;
 
-    NBodySimulation sim = NBodySimulation(std::make_unique<BarnesHutSimulation>(), params);
+    std::unique_ptr<SimulationAlgorithm> algorithm;
+
+    #ifdef USE_MPI
+        algorithm = std::make_unique<MpiNaiveSimulation>();
+    #else
+        algorithm = std::make_unique<NaiveSimulation>();
+    #endif
+
+    NBodySimulation sim(std::move(algorithm), params);
 
     std::string out = "output.txt";
     std::string hacc_dir;
@@ -67,6 +81,9 @@ int main(int argc, char **argv)
         }
     }
 
+    
+
+    #ifdef USE_MPI
     // Create MPI datatype for particle_t
     const int nitems = 4;
     int blocklengths[4] = {3, 3, 3, 1};
@@ -81,11 +98,13 @@ int main(int argc, char **argv)
     
     MPI_Type_create_struct(nitems, blocklengths, offsets, types, &mpi_particle_type);
     MPI_Type_commit(&mpi_particle_type);
+    #endif
 
     size_t n_particles = 0;
-
+    
     if (!hacc_dir.empty())
     {
+        #ifdef USE_MPI
         if (rank == 0) {
             std::cout << "Loading HACC snapshot: " << hacc_dir << "\n";
             sim.loadHACC(hacc_dir);
@@ -102,11 +121,18 @@ int main(int argc, char **argv)
         
         // Broadcast particles
         MPI_Bcast(sim.particles().data(), n_particles, mpi_particle_type, 0, MPI_COMM_WORLD);
+        #else
+        std::cout << "Loading HACC snapshot: " << hacc_dir << "\n";
+        sim.loadHACC(hacc_dir);
+        n_particles = sim.particles().size();
+        sim.particles().resize(n_particles);
+        #endif
     }
     else if (randomN > 0)
     {
         n_particles = randomN;
         
+        #ifdef USE_MPI
         if (rank == 0)
         {
             //sim.generateRandom(randomN, WORLD_WIDTH, WORLD_HEIGHT, WORLD_DEPTH);
@@ -128,17 +154,25 @@ int main(int argc, char **argv)
             printf("Rank %d: broadcasted particles\n", rank);
         }
         
+
         MPI_Barrier(MPI_COMM_WORLD);
         printf("Rank %d: received %zu particles\n", rank, sim.particles().size());
+        #else
+        sim.generateGalaxyDisk(n_particles, 
+            300.0f,   // disk radius
+            50.0f     // disk thickness
+        );
+        #endif
     }
     else if (use_solar)
     {
+        #ifdef USE_MPI
         if (rank == 0) {
             std::cout << "Setting up solar system\n";
             sim.setupSolarSystem(WORLD_WIDTH, WORLD_HEIGHT, WORLD_DEPTH);
             n_particles = sim.particles().size();
         }
-        
+
         // Broadcast particle count
         MPI_Bcast(&n_particles, 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
         
@@ -149,14 +183,23 @@ int main(int argc, char **argv)
         
         // Broadcast particles
         MPI_Bcast(sim.particles().data(), n_particles, mpi_particle_type, 0, MPI_COMM_WORLD);
+        #else
+        sim.setupSolarSystem(WORLD_WIDTH, WORLD_HEIGHT, WORLD_DEPTH);
+        n_particles = sim.particles().size();
+        #endif
     }
 
     PerformanceLogger logger(out, RunMode::Run);
+    #ifdef USE_MPI
     if (rank == 0 && !logger.ok())
         std::cerr << "Warning: could not open output log: " << out << "\n";
-
+    #else
+    if (!logger.ok())
+        std::cerr << "Warning: could not open output log: " << out << "\n";
+    #endif
     size_t log_step_size = 100;
 
+    #ifdef USE_MPI
     // Only rank 0 handles checkpointing
     if (rank == 0) 
     {
@@ -169,14 +212,27 @@ int main(int argc, char **argv)
         header.passed_steps = 0;
         checkpoint->write_header(header);
     }
+    #else
+    CheckpointManager* checkpoint = CheckpointManager::getInstance();
+    checkpoint->setFilePath("simulation_output.bin");
+    
+    SimulationOutputHeader header;
+    header.n_particles = n_particles;
+    header.target_steps = steps;
+    header.passed_steps = 0;
+    checkpoint->write_header(header);
+    #endif
 
+    #ifdef USE_MPI
     MPI_Barrier(MPI_COMM_WORLD);
+    #endif
     auto simulation_start = std::chrono::high_resolution_clock::now();
 
     for (size_t step = 0; step < steps; step++)
     {
         sim.step();
         
+        #ifdef USE_MPI
         if (rank == 0) {
             CheckpointManager* checkpoint = CheckpointManager::getInstance();
             checkpoint->write_step(sim.particles().data(), n_particles);
@@ -185,18 +241,35 @@ int main(int argc, char **argv)
                 std::cout << "Step " << step << " / " << steps << " completed" << std::endl;
             }
         }
+        #else
+        CheckpointManager* checkpoint = CheckpointManager::getInstance();
+        checkpoint->write_step(sim.particles().data(), n_particles);
+        
+        if (step % log_step_size == 0) {
+            std::cout << "Step " << step << " / " << steps << " completed" << std::endl;
+        }
+        #endif
     }
 
+    #ifdef USE_MPI
     MPI_Barrier(MPI_COMM_WORLD);
+    #endif
     auto simulation_end = std::chrono::high_resolution_clock::now();
-
+    #ifdef USE_MPI
     if (rank == 0) {
         double simulation_time = std::chrono::duration<double>(simulation_end - simulation_start).count();
         logger.log(n_particles, steps, simulation_time);
         std::cout << "Simulation completed in " << simulation_time << " seconds\n";
     }
+    #else
+        double simulation_time = std::chrono::duration<double>(simulation_end - simulation_start).count();
+        logger.log(n_particles, steps, simulation_time);
+        std::cout << "Simulation completed in " << simulation_time << " seconds\n";
+    #endif
 
+    #ifdef USE_MPI
     MPI_Type_free(&mpi_particle_type);
     MPI_Finalize();
+    #endif
     return 0;
 }

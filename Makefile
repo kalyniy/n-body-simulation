@@ -1,5 +1,15 @@
-CXX = mpic++
-CXXFLAGS = -std=c++20 -Wall -O0 -I./include -DUSE_MPI
+# Configuration: set to 'mpi' or 'seq'
+MODE ?= seq
+
+ifeq ($(MODE),mpi)
+    CXX = mpic++
+    CXXFLAGS = -std=c++20 -Wall -O0 -I./include -DUSE_MPI
+    MODE_SUFFIX = _mpi
+else
+    CXX = g++
+    CXXFLAGS = -std=c++20 -Wall -O0 -I./include
+    MODE_SUFFIX = _seq
+endif
 
 UNAME_S := $(shell uname -s)
 
@@ -7,12 +17,10 @@ LDFLAGS_COMMON = -lm
 LDFLAGS_GLUT   =
 
 ifeq ($(UNAME_S),Linux)
-    #CXXFLAGS += -DLINUX
     LDFLAGS_GLUT += -lglut -lGLU -lGL
 endif
 
 ifeq ($(UNAME_S),Darwin)
-    #CXXFLAGS += -DMACOS
     LDFLAGS_GLUT += -framework OpenGL -framework GLUT
 endif
 
@@ -26,8 +34,9 @@ CORE_SOURCES = \
     $(SRC_DIR)/Simulation.cpp \
     $(SRC_DIR)/PerformanceLogger.cpp \
     $(SRC_DIR)/NaiveSimulation.cpp \
+    $(SRC_DIR)/MpiNaiveSimulation.cpp \
     $(SRC_DIR)/BarnesHutSimulation.cpp \
-    $(SRC_DIR)/CheckpointManager.cpp 
+    $(SRC_DIR)/CheckpointManager.cpp
 
 CORE_OBJECTS = $(CORE_SOURCES:$(SRC_DIR)/%.cpp=$(BIN_DIR)/%.o)
 
@@ -41,11 +50,12 @@ VIEWER_SRC = \
 
 VIEWER_OBJS = $(VIEWER_SRC:$(SRC_DIR)/%.cpp=$(BIN_DIR)/%.o)
 
-# targets
-HEADLESS_TARGET = $(BIN_DIR)/nbody_headless
-VIEWER_TARGET   = $(BIN_DIR)/nbody_viewer
+# targets with mode suffix
+HEADLESS_TARGET = $(BIN_DIR)/nbody_headless$(MODE_SUFFIX)
+VIEWER_TARGET   = $(BIN_DIR)/nbody_viewer$(MODE_SUFFIX)
 
 all: $(BIN_DIR) $(HEADLESS_TARGET) $(VIEWER_TARGET)
+	@echo "Built $(MODE) version"
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR) $(BIN_DIR)/apps $(BIN_DIR)/renderers
@@ -64,9 +74,16 @@ $(BIN_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-.PHONY: clean run run_viewer debug help
+.PHONY: clean run run_viewer debug help seq mpi
 clean:
 	rm -rf $(BIN_DIR)
+
+# Convenience targets
+seq:
+	$(MAKE) MODE=seq
+
+mpi:
+	$(MAKE) MODE=mpi
 
 run: $(HEADLESS_TARGET)
 	./$(HEADLESS_TARGET)
@@ -79,8 +96,15 @@ debug: clean all
 
 help:
 	@echo "Targets:"
-	@echo "  all           - Build headless + viewer"
-	@echo "  run           - Run headless app"
-	@echo "  run_viewer    - Run OpenGL viewer"
-	@echo "  debug         - Debug build"
-	@echo "  clean         - Clean artifacts"
+	@echo "  make seq          - Build sequential version (default)"
+	@echo "  make mpi          - Build MPI version"
+	@echo "  make MODE=mpi     - Alternative way to build MPI"
+	@echo "  all               - Build headless + viewer"
+	@echo "  run               - Run headless app"
+	@echo "  run_viewer        - Run OpenGL viewer"
+	@echo "  debug             - Debug build"
+	@echo "  clean             - Clean artifacts"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make seq          - builds bin/nbody_headless_seq"
+	@echo "  make mpi          - builds bin/nbody_headless_mpi"

@@ -3,4 +3,4 @@ N-Body simulation Performance Per Run
 
  N Particles      N Steps     Time (s)         GFLOPS
 ---------------------------------------------------------------------
-       10000          100    62.903162           2.31
+       10000          100   216.841360           0.67
