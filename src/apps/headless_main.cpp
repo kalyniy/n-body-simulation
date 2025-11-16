@@ -34,7 +34,8 @@ int main(int argc, char **argv)
     #ifdef USE_MPI
         algorithm = std::make_unique<MpiNaiveSimulation>();
     #else
-        algorithm = std::make_unique<NaiveSimulation>();
+        // algorithm = std::make_unique<NaiveSimulation>();
+        algorithm = std::make_unique<BarnesHutSimulation>();
     #endif
 
     NBodySimulation sim(std::move(algorithm), params);
