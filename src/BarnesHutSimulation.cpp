@@ -4,6 +4,7 @@
 BarnesHutSimulation::BarnesHutSimulation(float theta, int leafBucketSize, int maxDepth)
     : theta_(theta)
 {
+    printf("BarnesHutSimulation ctor()\n");
     bp_.bucket_size = leafBucketSize;
     bp_.max_depth   = maxDepth;
     bp_.bounds_pad  = 1e-2f;
@@ -12,9 +13,11 @@ BarnesHutSimulation::BarnesHutSimulation(float theta, int leafBucketSize, int ma
 void BarnesHutSimulation::computeStep(std::vector<particle_t>& particles, const SimParams& params)
 {
 #ifdef USE_MPI
+    //printf("Barnes-hut using MPI\n");
     computeAccelerationsMPI_(particles, params);
     integrateMPI_(particles, params);
 #else
+    //printf("Serial Barnes-hut\n");
     computeAccelerations_(particles, params);
     integrate_(particles, params);
 #endif
@@ -48,7 +51,6 @@ void BarnesHutSimulation::integrate_(std::vector<particle_t>& particles, const S
 }
 
 #ifdef USE_MPI
-
 void BarnesHutSimulation::computeAccelerationsMPI_(std::vector<particle_t>& particles, 
                                                    const SimParams& params)
 {
@@ -64,44 +66,48 @@ void BarnesHutSimulation::computeAccelerationsMPI_(std::vector<particle_t>& part
     for (auto& p : particles) p.acceleration = {0, 0, 0};
     if (particles.empty()) return;
     
+    // Build the tree on ALL processes (replicated tree approach)
+    // Each process builds the same complete tree
+    Octree tree;
+    tree.build(particles, bp_);
+    
     // Determine local particle range
     size_t particles_per_proc = n / size;
     size_t remainder = n % size;
     size_t start = rank * particles_per_proc + std::min((size_t)rank, remainder);
     size_t end = start + particles_per_proc + (rank < remainder ? 1 : 0);
     
-    // CRITICAL: Only rank 0 builds the tree
-    Octree tree;
-    if (rank == 0) {
-        tree.build(particles, bp_);
+    // Each process computes accelerations for ITS subset of particles
+    std::vector<float> local_acc((end - start) * 3);
+    for (size_t i = start; i < end; ++i) {
+        vector3_t ai = tree.accelerationOn(i, G, eps2, theta_);
+        size_t local_idx = (i - start) * 3;
+        local_acc[local_idx + 0] = ai.x;
+        local_acc[local_idx + 1] = ai.y;
+        local_acc[local_idx + 2] = ai.z;
     }
     
-    // Broadcast tree is complex, so simpler approach:
-    // Rank 0 computes ALL accelerations, then broadcasts them
-    if (rank == 0) {
-        for (size_t i = 0; i < n; ++i) {
-            vector3_t ai = tree.accelerationOn(i, G, eps2, theta_);
-            particles[i].acceleration = ai;
-        }
+    // Gather all accelerations using Allgatherv
+    std::vector<int> recvcounts(size);
+    std::vector<int> displs(size);
+    
+    for (int r = 0; r < size; ++r) {
+        size_t r_start = r * particles_per_proc + std::min((size_t)r, remainder);
+        size_t r_end = r_start + particles_per_proc + (r < remainder ? 1 : 0);
+        recvcounts[r] = (r_end - r_start) * 3;
+        displs[r] = r_start * 3;
     }
     
-    // Broadcast accelerations to all processes
-    std::vector<float> acc_data(n * 3);
-    if (rank == 0) {
-        for (size_t i = 0; i < n; ++i) {
-            acc_data[i * 3 + 0] = particles[i].acceleration.x;
-            acc_data[i * 3 + 1] = particles[i].acceleration.y;
-            acc_data[i * 3 + 2] = particles[i].acceleration.z;
-        }
-    }
-    
-    MPI_Bcast(acc_data.data(), n * 3, MPI_FLOAT, 0, MPI_COMM_WORLD);
+    std::vector<float> all_acc(n * 3);
+    MPI_Allgatherv(local_acc.data(), local_acc.size(), MPI_FLOAT,
+                   all_acc.data(), recvcounts.data(), displs.data(),
+                   MPI_FLOAT, MPI_COMM_WORLD);
     
     // Unpack accelerations
     for (size_t i = 0; i < n; ++i) {
-        particles[i].acceleration.x = acc_data[i * 3 + 0];
-        particles[i].acceleration.y = acc_data[i * 3 + 1];
-        particles[i].acceleration.z = acc_data[i * 3 + 2];
+        particles[i].acceleration.x = all_acc[i * 3 + 0];
+        particles[i].acceleration.y = all_acc[i * 3 + 1];
+        particles[i].acceleration.z = all_acc[i * 3 + 2];
     }
 }
 

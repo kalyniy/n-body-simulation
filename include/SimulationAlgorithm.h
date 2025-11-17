@@ -8,6 +8,13 @@ struct SimParams
     float min_r2 = 1e-8f; // softening
 };
 
+enum class AlgorithmKind {
+    NaiveSeq,
+    NaiveMpi,
+    BarnesHutSeq,
+    BarnesHutMpi
+};
+
 class SimulationAlgorithm {
 public:
     virtual ~SimulationAlgorithm() = default;

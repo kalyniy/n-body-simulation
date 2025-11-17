@@ -14,7 +14,7 @@ void MpiNaiveSimulation::computeStep(std::vector<particle_t>& particles, const S
 
 void MpiNaiveSimulation::computeAccelerations_(std::vector<particle_t>& particles, const SimParams& params)
 {
-    #ifdef USE_MPI
+#ifdef USE_MPI
     const float eps2 = params.min_r2;
     const float G    = params.G;
 
@@ -28,7 +28,7 @@ void MpiNaiveSimulation::computeAccelerations_(std::vector<particle_t>& particle
     for (auto &p : particles)
         p.acceleration = {0.0f, 0.0f, 0.0f};
 
-    // 2) Every rank tells others how many particles it owns
+    // 2) Every rank tells others how many particles it owns (local subset)
     std::vector<int> counts(size);
     MPI_Allgather(&n_local, 1, MPI_INT,
                   counts.data(), 1, MPI_INT,
@@ -119,9 +119,9 @@ void MpiNaiveSimulation::computeAccelerations_(std::vector<particle_t>& particle
             B.swap(B_in);
         }
     }
-    #else
+#else
     exit(EXIT_FAILURE);
-    #endif
+#endif
 }
 
 void MpiNaiveSimulation::integrate_(std::vector<particle_t>& particles, const SimParams& params)

@@ -3,12 +3,14 @@ MODE ?= seq
 
 ifeq ($(MODE),mpi)
     CXX = mpic++
-    CXXFLAGS = -std=c++20 -Wall -O0 -I./include -DUSE_MPI
+    CXXFLAGS = -std=c++20 -Wall -O3 -I./include -DUSE_MPI
     MODE_SUFFIX = _mpi
+    OBJ_DIR = bin/mpi
 else
     CXX = g++
-    CXXFLAGS = -std=c++20 -Wall -O0 -I./include
+    CXXFLAGS = -std=c++20 -Wall -O3 -I./include
     MODE_SUFFIX = _seq
+    OBJ_DIR = bin/seq
 endif
 
 UNAME_S := $(shell uname -s)
@@ -38,43 +40,63 @@ CORE_SOURCES = \
     $(SRC_DIR)/BarnesHutSimulation.cpp \
     $(SRC_DIR)/CheckpointManager.cpp
 
-CORE_OBJECTS = $(CORE_SOURCES:$(SRC_DIR)/%.cpp=$(BIN_DIR)/%.o)
+CORE_OBJECTS = $(CORE_SOURCES:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 
 # ----- app sources -----
 HEADLESS_SRC = $(SRC_DIR)/apps/headless_main.cpp
-HEADLESS_OBJ = $(HEADLESS_SRC:$(SRC_DIR)/apps/%.cpp=$(BIN_DIR)/apps/%.o)
+HEADLESS_OBJ = $(HEADLESS_SRC:$(SRC_DIR)/apps/%.cpp=$(OBJ_DIR)/apps/%.o)
 
+# Viewer always built without MPI
 VIEWER_SRC = \
     $(SRC_DIR)/apps/viewer_main.cpp \
     $(SRC_DIR)/renderers/GlutRenderer.cpp
 
 VIEWER_OBJS = $(VIEWER_SRC:$(SRC_DIR)/%.cpp=$(BIN_DIR)/%.o)
 
-# targets with mode suffix
+# Only headless gets mode suffix
 HEADLESS_TARGET = $(BIN_DIR)/nbody_headless$(MODE_SUFFIX)
-VIEWER_TARGET   = $(BIN_DIR)/nbody_viewer$(MODE_SUFFIX)
+VIEWER_TARGET   = $(BIN_DIR)/nbody_viewer
 
 all: $(BIN_DIR) $(HEADLESS_TARGET) $(VIEWER_TARGET)
-	@echo "Built $(MODE) version"
+	@echo "Built $(MODE) headless and viewer"
 
 $(BIN_DIR):
-	mkdir -p $(BIN_DIR) $(BIN_DIR)/apps $(BIN_DIR)/renderers
+	mkdir -p $(BIN_DIR) $(OBJ_DIR) $(OBJ_DIR)/apps $(OBJ_DIR)/renderers $(BIN_DIR)/apps $(BIN_DIR)/renderers
 
-# link
+# link headless (with mode-specific objects)
 $(HEADLESS_TARGET): $(CORE_OBJECTS) $(HEADLESS_OBJ)
 	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS_COMMON)
 	@echo "Built $@"
 
-$(VIEWER_TARGET): $(CORE_OBJECTS) $(VIEWER_OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS_COMMON) $(LDFLAGS_GLUT)
+# link viewer (always sequential, recompile core objects without MPI)
+$(VIEWER_TARGET): $(BIN_DIR)/seq_core.stamp $(VIEWER_OBJS)
+	g++ -std=c++20 -Wall -O3 -I./include -o $@ \
+		$(BIN_DIR)/viewer_objs/*.o $(VIEWER_OBJS) \
+		$(LDFLAGS_COMMON) $(LDFLAGS_GLUT)
 	@echo "Built $@"
 
-# compile pattern rules
-$(BIN_DIR)/%.o: $(SRC_DIR)/%.cpp
+# Special rule to build core objects for viewer (always sequential)
+$(BIN_DIR)/seq_core.stamp: $(CORE_SOURCES)
+	@mkdir -p $(BIN_DIR)/viewer_objs
+	@for src in $(CORE_SOURCES); do \
+		obj=$$(echo $$src | sed 's|$(SRC_DIR)/|$(BIN_DIR)/viewer_objs/|; s|\.cpp$$|.o|'); \
+		mkdir -p $$(dirname $$obj); \
+		g++ -std=c++20 -Wall -O3 -I./include -c -o $$obj $$src; \
+	done
+	@touch $@
+
+# compile pattern rules for mode-specific objects
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
+# compile viewer objects (always without MPI)
+$(BIN_DIR)/%.o: $(SRC_DIR)/%.cpp
+	@mkdir -p $(dir $@)
+	g++ -std=c++20 -Wall -O3 -I./include -c -o $@ $<
+
 .PHONY: clean run run_viewer debug help seq mpi
+
 clean:
 	rm -rf $(BIN_DIR)
 
@@ -96,15 +118,15 @@ debug: clean all
 
 help:
 	@echo "Targets:"
-	@echo "  make seq          - Build sequential version (default)"
-	@echo "  make mpi          - Build MPI version"
-	@echo "  make MODE=mpi     - Alternative way to build MPI"
+	@echo "  make seq          - Build sequential headless + viewer"
+	@echo "  make mpi          - Build MPI headless + viewer"
 	@echo "  all               - Build headless + viewer"
 	@echo "  run               - Run headless app"
 	@echo "  run_viewer        - Run OpenGL viewer"
 	@echo "  debug             - Debug build"
 	@echo "  clean             - Clean artifacts"
 	@echo ""
-	@echo "Examples:"
-	@echo "  make seq          - builds bin/nbody_headless_seq"
-	@echo "  make mpi          - builds bin/nbody_headless_mpi"
+	@echo "Outputs:"
+	@echo "  bin/nbody_headless_seq  - Sequential headless"
+	@echo "  bin/nbody_headless_mpi  - MPI headless"
+	@echo "  bin/nbody_viewer        - Viewer (always sequential)"
