@@ -10,7 +10,7 @@
 struct AABB
 {
     vector3_t center;   // cube center
-    float half;         // half-size
+    float     half;     // half-size
 
     inline bool contains(const vector3_t& p) const
     {
@@ -33,7 +33,6 @@ public:
         int   bucket_size;
         int   max_depth;
         float bounds_pad;
-        // Explicit default ctor avoids GCC gripe when used from within Octree
         BuildParams() : bucket_size(8), max_depth(32), bounds_pad(1e-2f) {}
     };
 
@@ -43,7 +42,7 @@ public:
     void build(const std::vector<particle_t>& particles,
                const BuildParams& bp)
     {
-        bp_ = bp;
+        bp_    = bp;
         parts_ = &particles;
 
         // Compute a cubic root bounds around all particles
@@ -68,16 +67,43 @@ public:
         return acc;
     }
 
+#ifdef USE_MPI
+    // MPI-friendly flattened node for broadcast
+    struct MpiTreeNode {
+        float center[3];   // AABB center
+        float half;        // AABB half size
+        float com[3];      // center of mass
+        float mass;        // total mass in node
+        int   child[8];    // indices of children, -1 if none
+        int   leafOffset;  // index into leafIndices array, -1 if not leaf
+        int   leafCount;   // number of entries for this leaf
+        int   isLeaf;      // 1 if leaf, 0 otherwise
+    };
+
+    // Flatten the tree into arrays suitable for MPI broadcast
+    void exportToMpiTree(std::vector<MpiTreeNode>& outNodes,
+                         std::vector<int>& outLeafIndices) const
+    {
+        outNodes.clear();
+        outLeafIndices.clear();
+        if (root_ < 0 || nodes_.empty()) return;
+
+        outNodes.reserve(nodes_.size());
+        std::vector<int> idMap(nodes_.size(), -1);
+        exportNodeRecursive_(root_, outNodes, outLeafIndices, idMap);
+    }
+#endif
+
 private:
     struct Node
     {
-        AABB box;
-        float mass = 0.0f;         // total mass in this node
-        vector3_t com = {0,0,0};   // center of mass (mass-weighted)
-        bool leaf = true;
+        AABB      box;
+        float     mass = 0.0f;         // total mass in this node
+        vector3_t com  = {0,0,0};      // center of mass
+        bool      leaf = true;
 
         // Children by octant (bit-coded: x(1), y(2), z(4) relative to center)
-        std::array<int,8> child;   // index into nodes_, -1 if absent
+        std::array<int,8> child;       // index into nodes_, -1 if absent
 
         // Leaf bucket: indices of particles in this cell
         std::vector<int> bucket;
@@ -89,10 +115,10 @@ private:
     };
 
     // Members
-    std::vector<Node> nodes_;
-    int root_ = -1;
+    std::vector<Node>              nodes_;
+    int                            root_  = -1;
     const std::vector<particle_t>* parts_ = nullptr;
-    BuildParams bp_;
+    BuildParams                    bp_;
 
     // Helpers
     int newNode_(const AABB& b)
@@ -132,12 +158,11 @@ private:
         float dy = mx.y - mn.y;
         float dz = mx.z - mn.z;
         float extent = std::max(dx, std::max(dy, dz));
-        float half = 0.5f * extent;
+        float half   = 0.5f * extent;
 
         // Handle degenerate cases (all particles same pos)
         if (!(half > 0.0f)) half = 1.0f;
 
-        //half += bp_.bounds_pad; // small padding for inclusive splitting
         half *= (1.0f + bp_.bounds_pad);
         return {center, half};
     }
@@ -166,7 +191,6 @@ private:
     {
         const float newMass = n.mass + p.mass;
         if (newMass <= 0.0f) return;
-        // com = (m_old*com + m_p*pos) / (m_old + m_p)
         vector3_t num = n.com * n.mass + p.position * p.mass;
         n.com.x = num.x / newMass;
         n.com.y = num.y / newMass;
@@ -179,13 +203,15 @@ private:
         Node& n = nodes_[nodeId];
         const particle_t& p = (*parts_)[partIndex];
 
-        // Expand mass / COM first (Barnes–Hut standard)
+        // Expand mass / COM first
         accumulate_(n, p);
 
         if (n.leaf) {
             n.bucket.push_back(partIndex);
             // Subdivide if bucket too large and depth limit not reached
-            if (static_cast<int>(n.bucket.size()) > bp_.bucket_size && depth < bp_.max_depth) {
+            if (static_cast<int>(n.bucket.size()) > bp_.bucket_size &&
+                depth < bp_.max_depth)
+            {
                 subdivide_(nodeId, depth);
             }
             return;
@@ -219,7 +245,8 @@ private:
     }
 
     // Traversal for acceleration accumulation on particle i
-    void traverseAccumulate_(int nodeId, int i, float G, float eps2, float theta, vector3_t& acc) const
+    void traverseAccumulate_(int nodeId, int i, float G, float eps2,
+                             float theta, vector3_t& acc) const
     {
         const Node& n = nodes_[nodeId];
         if (n.mass <= 0.0f) return;
@@ -229,18 +256,19 @@ private:
         // Vector from particle to node COM
         vector3_t r = { n.com.x - pi.x, n.com.y - pi.y, n.com.z - pi.z };
         float r2_true = r.x * r.x + r.y * r.y + r.z * r.z;
-        //float r2 = r.x * r.x + r.y * r.y + r.z * r.z + eps2;
 
         // If leaf, sum direct interactions with contained particles (skip self)
         if (n.leaf) {
             for (int j : n.bucket) {
                 if (j == i) continue;
                 const particle_t& pj = (*parts_)[j];
-                vector3_t rij = { pj.position.x - pi.x, pj.position.y - pi.y, pj.position.z - pi.z };
-                float d2 = rij.x * rij.x + rij.y * rij.y + rij.z * rij.z + eps2;
-                float inv_r = 1.0f / std::sqrt(d2);
+                vector3_t rij = { pj.position.x - pi.x,
+                                  pj.position.y - pi.y,
+                                  pj.position.z - pi.z };
+                float d2     = rij.x * rij.x + rij.y * rij.y + rij.z * rij.z + eps2;
+                float inv_r  = 1.0f / std::sqrt(d2);
                 float inv_r3 = inv_r * inv_r * inv_r;
-                float s = G * pj.mass * inv_r3;
+                float s      = G * pj.mass * inv_r3;
                 acc.x += rij.x * s;
                 acc.y += rij.y * s;
                 acc.z += rij.z * s;
@@ -250,12 +278,12 @@ private:
 
         // Opening criterion: if (s / d) < theta, use monopole approximation
         const float s = n.box.half * 2.0f;      // node width
-        float d = std::sqrt(r2_true);           // distance to COM (softened)
+        float d       = std::sqrt(r2_true);     // distance to COM
         if ((s / d) < theta) {
             float r2_soft = r2_true + eps2;
-            float inv_r = 1.0f / std::sqrt(r2_soft);
-            float inv_r3 = inv_r * inv_r * inv_r;
-            float sgm = G * n.mass * inv_r3;
+            float inv_r   = 1.0f / std::sqrt(r2_soft);
+            float inv_r3  = inv_r * inv_r * inv_r;
+            float sgm     = G * n.mass * inv_r3;
             acc.x += r.x * sgm;
             acc.y += r.y * sgm;
             acc.z += r.z * sgm;
@@ -270,4 +298,61 @@ private:
             }
         }
     }
+
+#ifdef USE_MPI
+    void exportNodeRecursive_(int nodeId,
+                              std::vector<MpiTreeNode>& outNodes,
+                              std::vector<int>& outLeafIndices,
+                              std::vector<int>& idMap) const
+    {
+        if (idMap[nodeId] != -1) return; // already exported
+
+        const Node& n = nodes_[nodeId];
+
+        MpiTreeNode m{};
+        m.center[0] = n.box.center.x;
+        m.center[1] = n.box.center.y;
+        m.center[2] = n.box.center.z;
+        m.half      = n.box.half;
+
+        m.com[0]    = n.com.x;
+        m.com[1]    = n.com.y;
+        m.com[2]    = n.com.z;
+        m.mass      = n.mass;
+
+        m.leafOffset = -1;
+        m.leafCount  = 0;
+        m.isLeaf     = n.leaf ? 1 : 0;
+
+        for (int i = 0; i < 8; ++i) {
+            m.child[i] = -1;
+        }
+
+        int newIdx = static_cast<int>(outNodes.size());
+        outNodes.push_back(m);
+        idMap[nodeId] = newIdx;
+
+        if (n.leaf)
+        {
+            if (!n.bucket.empty()) {
+                m.leafOffset = static_cast<int>(outLeafIndices.size());
+                m.leafCount  = static_cast<int>(n.bucket.size());
+                for (int pi : n.bucket) {
+                    outLeafIndices.push_back(pi);
+                }
+            }
+            outNodes[newIdx] = m;
+            return;
+        }
+
+        // Internal node: export children
+        for (int oct = 0; oct < 8; ++oct) {
+            int ci = n.child[oct];
+            if (ci == -1) continue;
+            exportNodeRecursive_(ci, outNodes, outLeafIndices, idMap);
+            int childNewIdx = idMap[ci];
+            outNodes[newIdx].child[oct] = childNewIdx;
+        }
+    }
+#endif
 };

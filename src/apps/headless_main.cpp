@@ -116,8 +116,6 @@ int main(int argc, char **argv)
         }
     }
 
-    
-
 #ifdef USE_MPI
     // Create MPI datatype for particle_t
     const int nitems = 4;

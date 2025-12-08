@@ -17,33 +17,35 @@ public:
                                  int   maxDepth = 32);
 
     void setTheta(float t) { theta_ = t; }
-    void computeStep(std::vector<particle_t>& particles, const SimParams& params) override;
+
+    void computeStep(std::vector<particle_t>& particles,
+                     const SimParams& params) override;
 
 private:
-    void computeAccelerations_(std::vector<particle_t>& particles, const SimParams& params);
-    void integrate_(std::vector<particle_t>& particles, const SimParams& params);
+    void computeAccelerations_(std::vector<particle_t>& particles,
+                               const SimParams& params);
+    void integrate_(std::vector<particle_t>& particles,
+                    const SimParams& params);
     
 #ifdef USE_MPI
-    void computeAccelerationsMPI_(std::vector<particle_t>& particles, const SimParams& params);
-    void integrateMPI_(std::vector<particle_t>& particles, const SimParams& params);
-    
-    // MPI-specific helpers
-    struct TreeNode {
-        vector3_t com;
-        float mass;
-        float box_half;
-        vector3_t box_center;
-        bool is_leaf;
-    };
-    
-    void extractEssentialNodes_(const Octree& tree, std::vector<TreeNode>& nodes);
-    void buildLocalTree_(const std::vector<particle_t>& particles, 
-                        size_t start, size_t end,
-                        Octree& tree);
-    void exchangeTreeData_(std::vector<TreeNode>& local_nodes,
-                          std::vector<std::vector<TreeNode>>& all_nodes);
+    void computeAccelerationsMPI_(std::vector<particle_t>& particles,
+                                  const SimParams& params);
+    void integrateMPI_(std::vector<particle_t>& particles,
+                       const SimParams& params);
+
+    // MPI-friendly broadcasted tree
+    std::vector<Octree::MpiTreeNode> mpi_nodes_;
+    std::vector<int>                 mpi_leafIndices_;
+
+    void traverseMpiTreeAccumulate_(int nodeId,
+                                    int i,
+                                    float G,
+                                    float eps2,
+                                    float theta,
+                                    vector3_t& acc,
+                                    const std::vector<particle_t>& particles) const;
 #endif
 
-    float theta_;
+    float              theta_;
     Octree::BuildParams bp_;
 };
