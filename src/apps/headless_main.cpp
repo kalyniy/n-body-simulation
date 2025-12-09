@@ -144,7 +144,10 @@ int main(int argc, char **argv)
     std::vector<int> displs;
     int n_local = 0;
 
-    bool domain_decomposed = (algo_kind == AlgorithmKind::NaiveMpi);
+    // Both NaiveMpi and BarnesHutMpi use index-based domain decomposition
+    bool domain_decomposed =
+        (algo_kind == AlgorithmKind::NaiveMpi ||
+         algo_kind == AlgorithmKind::BarnesHutMpi);
 #endif
 
     // -------------------------
@@ -221,9 +224,9 @@ int main(int argc, char **argv)
     MPI_Bcast(&n_particles_global, 1, MPI_UNSIGNED_LONG, 0, MPI_COMM_WORLD);
 
     if (domain_decomposed) {
-        // ========= MpiNaive: domain-decomposed layout =========
+        // ========= MpiNaive & BarnesHutMpi: domain-decomposed layout =========
         if (rank == 0) {
-            global_particles = sim.particles();  // copy full array
+            global_particles = sim.particles();  // copy full array (HACC/random/solar)
         }
 
         counts.resize(processes_count);
@@ -253,7 +256,7 @@ int main(int argc, char **argv)
 
         std::printf("Rank %d: local n = %d\n", rank, n_local);
     } else {
-        // ========= BarnesHutMpi: replicated layout =========
+        // ========= (fallback replicated layout for future algorithms) =========
         if (rank != 0) {
             sim.particles().resize(n_particles_global);
         }
@@ -343,7 +346,6 @@ int main(int argc, char **argv)
 
 #ifdef USE_MPI
         if (domain_decomposed) {
-            // ----- MpiNaive: gather local chunks -----
             MPI_Gatherv(
                 sim.particles().data(), n_local, mpi_particle_type,
                 rank == 0 ? global_buffer.data() : nullptr,

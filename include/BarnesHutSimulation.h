@@ -34,8 +34,12 @@ private:
                        const SimParams& params);
 
     // MPI-friendly broadcasted tree
-    std::vector<Octree::MpiTreeNode> mpi_nodes_;
-    std::vector<int>                 mpi_leafIndices_;
+    std::vector<Octree::MpiTreeNode>       mpi_nodes_;
+    std::vector<Octree::MpiLeafParticle>   mpi_leafParticles_;
+
+    // buffers used on rank 0 for gather & tree build
+    std::vector<float>                     globalPosMass_;   // 4 floats per particle: x,y,z,m
+    std::vector<particle_t>                globalParticles_;
 
     void traverseMpiTreeAccumulate_(int nodeId,
                                     int i,

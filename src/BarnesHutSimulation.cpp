@@ -65,71 +65,126 @@ void BarnesHutSimulation::integrate_(std::vector<particle_t>& particles,
 // Rank 0 builds the tree, flattens it, and broadcasts to all ranks.
 // All ranks traverse the same tree but only for their subset of particles.
 
-void BarnesHutSimulation::computeAccelerationsMPI_(std::vector<particle_t>& particles, 
+void BarnesHutSimulation::computeAccelerationsMPI_(std::vector<particle_t>& particles,
                                                    const SimParams& params)
 {
     int rank, size;
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
 
-    const size_t n    = particles.size();
-    const float  G    = params.G;
-    const float  eps2 = params.min_r2;
+    const int   localN = static_cast<int>(particles.size());
+    const float G      = params.G;
+    const float eps2   = params.min_r2;
 
     // Reset accelerations
     for (auto& p : particles) {
         p.acceleration = {0.0f, 0.0f, 0.0f};
     }
-    if (n == 0) return;
+    if (localN == 0) return;
 
-    int nodeCount      = 0;
-    int leafIndexCount = 0;
+    // 1) Gather local counts so rank 0 knows the global N and layout
+    std::vector<int> counts(size);
+    MPI_Allgather(&localN, 1, MPI_INT,
+                  counts.data(), 1, MPI_INT,
+                  MPI_COMM_WORLD);
 
-    // 1) Rank 0 builds the Octree and exports to MPI-friendly arrays
+    int globalN = 0;
+    std::vector<int> displs(size, 0);
     if (rank == 0) {
-        Octree tree;
-        tree.build(particles, bp_);
-        tree.exportToMpiTree(mpi_nodes_, mpi_leafIndices_);
-
-        nodeCount      = static_cast<int>(mpi_nodes_.size());
-        leafIndexCount = static_cast<int>(mpi_leafIndices_.size());
+        for (int r = 0; r < size; ++r) {
+            displs[r] = globalN;
+            globalN  += counts[r];
+        }
     }
 
-    // 2) Broadcast tree sizes
-    MPI_Bcast(&nodeCount,      1, MPI_INT, 0, MPI_COMM_WORLD);
-    MPI_Bcast(&leafIndexCount, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    // 2) Pack local positions + masses (4 floats per particle)
+    std::vector<float> sendbuf(4 * localN);
+    for (int i = 0; i < localN; ++i) {
+        const auto& p = particles[i];
+        const int idx = 4 * i;
+        sendbuf[idx + 0] = p.position.x;
+        sendbuf[idx + 1] = p.position.y;
+        sendbuf[idx + 2] = p.position.z;
+        sendbuf[idx + 3] = p.mass;
+    }
+
+    // 3) Gatherv packed data on rank 0 (like reference code's MPI_Gather on rr)
+    std::vector<int> recvcountsF;
+    std::vector<int> displsF;
+    if (rank == 0) {
+        recvcountsF.resize(size);
+        displsF.resize(size);
+
+        int offsetF = 0;
+        for (int r = 0; r < size; ++r) {
+            recvcountsF[r] = 4 * counts[r];
+            displsF[r]     = offsetF;
+            offsetF       += recvcountsF[r];
+        }
+        globalPosMass_.resize(offsetF);
+    }
+
+    MPI_Gatherv(sendbuf.data(), 4 * localN, MPI_FLOAT,
+                rank == 0 ? globalPosMass_.data() : nullptr,
+                rank == 0 ? recvcountsF.data()     : nullptr,
+                rank == 0 ? displsF.data()         : nullptr,
+                MPI_FLOAT,
+                0, MPI_COMM_WORLD);
+
+    // 4) Rank 0 builds tree from global positions/masses and serializes it
+    int nodeCount = 0;
+    int leafCount = 0;
+
+    if (rank == 0) {
+        globalParticles_.resize(globalN);
+
+        for (int i = 0; i < globalN; ++i) {
+            const int idx = 4 * i;
+            auto& p = globalParticles_[i];
+
+            p.position.x = globalPosMass_[idx + 0];
+            p.position.y = globalPosMass_[idx + 1];
+            p.position.z = globalPosMass_[idx + 2];
+            p.mass       = globalPosMass_[idx + 3];
+
+            // velocities/accels are not needed for tree build
+            p.velocity    = {0.0f, 0.0f, 0.0f};
+            p.acceleration = {0.0f, 0.0f, 0.0f};
+        }
+
+        Octree tree;
+        tree.build(globalParticles_, bp_);
+        tree.exportToMpiTree(mpi_nodes_, mpi_leafParticles_);
+
+        nodeCount = static_cast<int>(mpi_nodes_.size());
+        leafCount = static_cast<int>(mpi_leafParticles_.size());
+    }
+
+    // 5) Broadcast tree sizes
+    MPI_Bcast(&nodeCount, 1, MPI_INT, 0, MPI_COMM_WORLD);
+    MPI_Bcast(&leafCount, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     mpi_nodes_.resize(nodeCount);
-    mpi_leafIndices_.resize(leafIndexCount);
+    mpi_leafParticles_.resize(leafCount);
 
-    // 3) Broadcast tree data
+    // 6) Broadcast serialized tree
     if (nodeCount > 0) {
         MPI_Bcast(reinterpret_cast<unsigned char*>(mpi_nodes_.data()),
                   nodeCount * static_cast<int>(sizeof(Octree::MpiTreeNode)),
                   MPI_BYTE, 0, MPI_COMM_WORLD);
     }
-    if (leafIndexCount > 0) {
-        MPI_Bcast(mpi_leafIndices_.data(),
-                  leafIndexCount,
-                  MPI_INT, 0, MPI_COMM_WORLD);
+    if (leafCount > 0) {
+        MPI_Bcast(reinterpret_cast<unsigned char*>(mpi_leafParticles_.data()),
+                  leafCount * static_cast<int>(sizeof(Octree::MpiLeafParticle)),
+                  MPI_BYTE, 0, MPI_COMM_WORLD);
     }
 
-    // 4) Determine local particle range for this rank
-    const size_t base      = n / size;
-    const size_t remainder = n % size;
-
-    const size_t start =
-        static_cast<size_t>(rank) * base +
-        std::min(static_cast<size_t>(rank), remainder);
-    const size_t end =
-        start + base + (rank < static_cast<int>(remainder) ? 1 : 0);
-
-    // 5) Compute accelerations for local subset
-    for (size_t i = start; i < end; ++i) {
+    // 7) Compute accelerations for this rank's *local* particles only
+    for (int i = 0; i < localN; ++i) {
         vector3_t acc = {0.0f, 0.0f, 0.0f};
+
         if (nodeCount > 0) {
-            traverseMpiTreeAccumulate_(0, static_cast<int>(i),
-                                       G, eps2, theta_,
+            traverseMpiTreeAccumulate_(0, i, G, eps2, theta_,
                                        acc, particles);
         }
         particles[i].acceleration = acc;
@@ -168,20 +223,21 @@ void BarnesHutSimulation::traverseMpiTreeAccumulate_(int nodeId,
         if (node.leafOffset >= 0 && node.leafCount > 0) {
             const int offset = node.leafOffset;
             const int count  = node.leafCount;
-            for (int k = 0; k < count; ++k) {
-                int j = mpi_leafIndices_[offset + k];
-                if (j == i) continue;
 
-                const particle_t& pj = particles[j];
+            for (int k = 0; k < count; ++k) {
+                const auto& lp = mpi_leafParticles_[offset + k];
+
                 vector3_t rij = {
-                    pj.position.x - pi.x,
-                    pj.position.y - pi.y,
-                    pj.position.z - pi.z
+                    lp.pos[0] - pi.x,
+                    lp.pos[1] - pi.y,
+                    lp.pos[2] - pi.z
                 };
+
                 float d2     = rij.x * rij.x + rij.y * rij.y + rij.z * rij.z + eps2;
                 float inv_r  = 1.0f / std::sqrt(d2);
                 float inv_r3 = inv_r * inv_r * inv_r;
-                float s      = G * pj.mass * inv_r3;
+                float s      = G * lp.mass * inv_r3;
+
                 acc.x += rij.x * s;
                 acc.y += rij.y * s;
                 acc.z += rij.z * s;
@@ -220,90 +276,15 @@ void BarnesHutSimulation::traverseMpiTreeAccumulate_(int nodeId,
 // Each rank updates only its block of particles, then all ranks exchange
 // (position, velocity, mass) via Allgatherv (7 floats / particle).
 
-void BarnesHutSimulation::integrateMPI_(std::vector<particle_t>& particles, 
+void BarnesHutSimulation::integrateMPI_(std::vector<particle_t>& particles,
                                         const SimParams& params)
 {
-    int rank, size;
-    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-    MPI_Comm_size(MPI_COMM_WORLD, &size);
+    const float dt = params.dt;
 
-    const float  dt = params.dt;
-    const size_t n  = particles.size();
-    if (n == 0) return;
-
-    const size_t base      = n / size;
-    const size_t remainder = n % size;
-
-    const size_t start =
-        static_cast<size_t>(rank) * base +
-        std::min(static_cast<size_t>(rank), remainder);
-    const size_t end =
-        start + base + (rank < static_cast<int>(remainder) ? 1 : 0);
-    const size_t local_count = (end > start) ? (end - start) : 0;
-
-    // 1) Update our local chunk
-    for (size_t i = start; i < end; ++i) {
-        auto& p = particles[i];
+    for (auto& p : particles) {
         p.velocity  += p.acceleration * dt;
         p.position  += p.velocity * dt;
-    }
-
-    // 2) Pack local data: pos (3) + vel (3) + mass (1) = 7 floats
-    std::vector<float> sendbuf(local_count * 7);
-    for (size_t i = 0; i < local_count; ++i) {
-        const auto& p = particles[start + i];
-        const size_t idx = i * 7;
-        sendbuf[idx + 0] = p.position.x;
-        sendbuf[idx + 1] = p.position.y;
-        sendbuf[idx + 2] = p.position.z;
-        sendbuf[idx + 3] = p.velocity.x;
-        sendbuf[idx + 4] = p.velocity.y;
-        sendbuf[idx + 5] = p.velocity.z;
-        sendbuf[idx + 6] = p.mass;
-    }
-
-    // 3) Prepare recvcounts / displs for Allgatherv
-    std::vector<int> recvcounts(size);
-    std::vector<int> displs(size);
-
-    for (int r = 0; r < size; ++r) {
-        const size_t r_base      = n / size;
-        const size_t r_remainder = n % size;
-        const size_t r_start =
-            static_cast<size_t>(r) * r_base +
-            std::min(static_cast<size_t>(r), r_remainder);
-        const size_t r_end =
-            r_start + r_base +
-            (r < static_cast<int>(r_remainder) ? 1 : 0);
-        const size_t r_local_count = (r_end > r_start) ? (r_end - r_start) : 0;
-
-        recvcounts[r] = static_cast<int>(r_local_count * 7);
-        displs[r]     = static_cast<int>(r_start * 7);
-    }
-
-    // 4) Gather updated state to all ranks
-    std::vector<float> recvbuf(n * 7);
-    MPI_Allgatherv(sendbuf.data(),
-                   static_cast<int>(sendbuf.size()),
-                   MPI_FLOAT,
-                   recvbuf.data(),
-                   recvcounts.data(),
-                   displs.data(),
-                   MPI_FLOAT,
-                   MPI_COMM_WORLD);
-
-    // 5) Unpack into our local particle array (replicated on all ranks)
-    for (size_t i = 0; i < n; ++i) {
-        const size_t idx = i * 7;
-        auto& p = particles[i];
-        p.position.x = recvbuf[idx + 0];
-        p.position.y = recvbuf[idx + 1];
-        p.position.z = recvbuf[idx + 2];
-        p.velocity.x = recvbuf[idx + 3];
-        p.velocity.y = recvbuf[idx + 4];
-        p.velocity.z = recvbuf[idx + 5];
-        p.mass       = recvbuf[idx + 6];
-        // acceleration will be overwritten next step
+        // acceleration will be overwritten on next computeAccelerationsMPI_
     }
 }
 

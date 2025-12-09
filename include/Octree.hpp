@@ -75,22 +75,28 @@ public:
         float com[3];      // center of mass
         float mass;        // total mass in node
         int   child[8];    // indices of children, -1 if none
-        int   leafOffset;  // index into leafIndices array, -1 if not leaf
+        int   leafOffset;  // index into leafParticles array, -1 if not leaf
         int   leafCount;   // number of entries for this leaf
         int   isLeaf;      // 1 if leaf, 0 otherwise
     };
 
+    // Leaf particle data stored in the serialized tree
+    struct MpiLeafParticle {
+        float pos[3];
+        float mass;
+    };
+
     // Flatten the tree into arrays suitable for MPI broadcast
     void exportToMpiTree(std::vector<MpiTreeNode>& outNodes,
-                         std::vector<int>& outLeafIndices) const
+                         std::vector<MpiLeafParticle>& outLeafParticles) const
     {
         outNodes.clear();
-        outLeafIndices.clear();
+        outLeafParticles.clear();
         if (root_ < 0 || nodes_.empty()) return;
 
         outNodes.reserve(nodes_.size());
         std::vector<int> idMap(nodes_.size(), -1);
-        exportNodeRecursive_(root_, outNodes, outLeafIndices, idMap);
+        exportNodeRecursive_(root_, outNodes, outLeafParticles, idMap);
     }
 #endif
 
@@ -302,7 +308,7 @@ private:
 #ifdef USE_MPI
     void exportNodeRecursive_(int nodeId,
                               std::vector<MpiTreeNode>& outNodes,
-                              std::vector<int>& outLeafIndices,
+                              std::vector<MpiLeafParticle>& outLeafParticles,
                               std::vector<int>& idMap) const
     {
         if (idMap[nodeId] != -1) return; // already exported
@@ -335,10 +341,19 @@ private:
         if (n.leaf)
         {
             if (!n.bucket.empty()) {
-                m.leafOffset = static_cast<int>(outLeafIndices.size());
+                m.leafOffset = static_cast<int>(outLeafParticles.size());
                 m.leafCount  = static_cast<int>(n.bucket.size());
+
                 for (int pi : n.bucket) {
-                    outLeafIndices.push_back(pi);
+                    const particle_t& p = (*parts_)[pi];
+
+                    MpiLeafParticle lp{};
+                    lp.pos[0] = p.position.x;
+                    lp.pos[1] = p.position.y;
+                    lp.pos[2] = p.position.z;
+                    lp.mass   = p.mass;
+
+                    outLeafParticles.push_back(lp);
                 }
             }
             outNodes[newIdx] = m;
@@ -349,7 +364,7 @@ private:
         for (int oct = 0; oct < 8; ++oct) {
             int ci = n.child[oct];
             if (ci == -1) continue;
-            exportNodeRecursive_(ci, outNodes, outLeafIndices, idMap);
+            exportNodeRecursive_(ci, outNodes, outLeafParticles, idMap);
             int childNewIdx = idMap[ci];
             outNodes[newIdx].child[oct] = childNewIdx;
         }
