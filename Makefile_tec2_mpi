@@ -1,0 +1,41 @@
+CXX = mpic++
+CXXFLAGS = -std=c++20 -Wall -O3 -I./include -DUSE_MPI
+LDFLAGS = -lm
+
+SRC_DIR = src
+OBJ_DIR = bin/mpi
+BIN_DIR = bin
+
+CORE_SOURCES = \
+    $(SRC_DIR)/DatasetLoader.cpp \
+    $(SRC_DIR)/Simulation.cpp \
+    $(SRC_DIR)/PerformanceLogger.cpp \
+    $(SRC_DIR)/NaiveSimulation.cpp \
+    $(SRC_DIR)/MpiNaiveSimulation.cpp \
+    $(SRC_DIR)/BarnesHutSimulation.cpp \
+    $(SRC_DIR)/CheckpointManager.cpp
+
+HEADLESS_SRC = $(SRC_DIR)/apps/headless_main.cpp
+
+CORE_OBJECTS = $(CORE_SOURCES:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
+HEADLESS_OBJ = $(OBJ_DIR)/apps/headless_main.o
+
+TARGET = $(BIN_DIR)/nbody_headless_mpi
+
+all: $(TARGET)
+	@echo "Built $(TARGET)"
+
+$(TARGET): $(CORE_OBJECTS) $(HEADLESS_OBJ)
+	$(CXX) $(CXXFLAGS) -o $@ $^ $(LDFLAGS)
+
+$(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
+	@mkdir -p $(dir $@)
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
+
+clean:
+	rm -rf $(BIN_DIR)
+
+run: $(TARGET)
+	mpirun -n 4 ./$(TARGET)
+
+.PHONY: all clean run
