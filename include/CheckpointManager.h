@@ -40,9 +40,11 @@ public:
     }
 
     void write_header(SimulationOutputHeader header);
+    void write_masses(particle_t* particles, int count);
     void increment_passed_steps();
     void write_step(particle_t* particles, int count);
 
     SimulationOutputHeader read_header();
+    void read_masses(float* masses_out, size_t n_particles);
     size_t read_step(float* positions_out, size_t step_index);
 };

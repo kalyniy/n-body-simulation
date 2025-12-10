@@ -175,11 +175,20 @@ int main(int argc, char **argv)
         if (rank == 0)
         {
             n_particles_global = randomN;
+            /*
             sim.generateGalaxyDisk(
                 n_particles_global,
                 300.0f,
                 50.0f
             );
+            */
+
+            sim.generatePlummerSphere(
+                n_particles_global,
+                100.0f,     // scale_radius
+                (double)n_particles_global * (double)(1.0f)    // total_mass (1.0 per particle)
+            );
+
             std::printf("Rank %d: generated %zu particles\n", rank, n_particles_global);
         }
         #else
@@ -308,6 +317,7 @@ int main(int argc, char **argv)
         header.target_steps = steps;
         header.passed_steps = 0;
         checkpoint->write_header(header);
+        checkpoint->write_masses(global_particles.data(), n_particles_global);
     }
 #else
     {
@@ -319,6 +329,7 @@ int main(int argc, char **argv)
         header.target_steps = steps;
         header.passed_steps = 0;
         checkpoint->write_header(header);
+        checkpoint->write_masses(sim.particles().data(), n_particles_global);
     }
 #endif
 

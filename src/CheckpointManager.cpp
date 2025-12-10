@@ -24,6 +24,29 @@ void CheckpointManager::write_header(SimulationOutputHeader header)
     file.close();
 }
 
+void CheckpointManager::write_masses(particle_t* particles, int count)
+{
+    std::fstream file(this->filePath, std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
+    
+    if (!file) {
+        perror("Error opening file for writing masses\n");
+        #ifdef USE_MPI
+        MPI_Finalize();
+        #endif
+        exit(EXIT_FAILURE);
+    }
+
+    float* masses = new float[count];
+    for (int i = 0; i < count; i++) {
+        masses[i] = particles[i].mass;
+    }
+    
+    file.write(reinterpret_cast<const char*>(masses), count * sizeof(float));
+    
+    delete[] masses;
+    file.close();
+}
+
 void CheckpointManager::increment_passed_steps()
 {
     std::fstream file(this->filePath, std::ios::in | std::ios::out | std::ios::binary);
@@ -101,6 +124,23 @@ SimulationOutputHeader CheckpointManager::read_header()
     return header;
 }
 
+void CheckpointManager::read_masses(float* masses_out, size_t n_particles)
+{
+    std::ifstream file(this->filePath, std::ios::in | std::ios::binary);
+    
+    if (!file) {
+        perror("Error opening file for reading masses\n");
+        #ifdef USE_MPI
+        MPI_Finalize();
+        #endif
+        exit(EXIT_FAILURE);
+    }
+
+    file.seekg(sizeof(SimulationOutputHeader), std::ios::beg);
+    file.read(reinterpret_cast<char*>(masses_out), n_particles * sizeof(float));
+    file.close();
+}
+
 size_t CheckpointManager::read_step(float* positions_out, size_t step_index)
 {
     std::ifstream file(this->filePath, std::ios::in | std::ios::binary);
@@ -116,7 +156,7 @@ size_t CheckpointManager::read_step(float* positions_out, size_t step_index)
     // Read header to get particle count
     SimulationOutputHeader header;
     file.read(reinterpret_cast<char*>(&header), sizeof(SimulationOutputHeader));
-    
+
     // Check if step_index is valid
     if (step_index >= header.passed_steps) {
         file.close();
@@ -124,9 +164,10 @@ size_t CheckpointManager::read_step(float* positions_out, size_t step_index)
     }
     
     // Calculate offset to the desired step
-    // Offset = header size + (step_index * particles_per_step * 3 floats * sizeof(float))
+    // Offset = header + masses + (step_index * positions_per_step)
+    size_t mass_data_size = header.n_particles * sizeof(float);
     size_t step_data_size = header.n_particles * 3 * sizeof(float);
-    size_t offset = sizeof(SimulationOutputHeader) + (step_index * step_data_size);
+    size_t offset = sizeof(SimulationOutputHeader) + mass_data_size + (step_index * step_data_size);
     
     file.seekg(offset, std::ios::beg);
     file.read(reinterpret_cast<char*>(positions_out), step_data_size);

@@ -3,3 +3,4 @@ main.o
 .vscode
 bin/
 *.bin
+vtk_output/

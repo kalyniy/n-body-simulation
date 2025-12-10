@@ -213,7 +213,7 @@ void NBodySimulation::generatePlummerSphere(int n_particles,
         // Cumulative mass: M(r) = M × r³ / (r² + a²)^(3/2)
         // Inverse: r = a / sqrt(u^(-2/3) - 1), where u ~ Uniform(0,1)
         
-        float u = uniformRandom(0.0f, 1.0f);
+        float u = uniformRandom(0.001f, 1.0f);
         float r = scale_radius / std::sqrt(std::pow(u, -2.0f/3.0f) - 1.0f);
         
         // Random direction on sphere
@@ -253,6 +253,16 @@ void NBodySimulation::generatePlummerSphere(int n_particles,
         particles_.push_back(p);
     }
     
+    vector3_t total_momentum = {0, 0, 0};
+    float total_m = 0;
+    for (const auto& p : particles_) {
+        total_momentum += p.velocity * p.mass;
+        total_m += p.mass;
+    }
+    vector3_t bulk_velocity = total_momentum * (1.0f / total_m);
+    for (auto& p : particles_) {
+        p.velocity -= bulk_velocity;
+    }
     std::cout << "Plummer sphere generated successfully!\n";
 }
 

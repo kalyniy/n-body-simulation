@@ -56,9 +56,10 @@ VIEWER_OBJS = $(VIEWER_SRC:$(SRC_DIR)/%.cpp=$(BIN_DIR)/%.o)
 # Only headless gets mode suffix
 HEADLESS_TARGET = $(BIN_DIR)/nbody_headless$(MODE_SUFFIX)
 VIEWER_TARGET   = $(BIN_DIR)/nbody_viewer
+VTK_CONVERTER   = $(BIN_DIR)/checkpoint_to_vtk
 
-all: $(BIN_DIR) $(HEADLESS_TARGET) $(VIEWER_TARGET)
-	@echo "Built $(MODE) headless and viewer"
+all: $(BIN_DIR) $(HEADLESS_TARGET) $(VIEWER_TARGET) $(VTK_CONVERTER)
+	@echo "Built $(MODE) headless, viewer, and vtk converter"
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR) $(OBJ_DIR) $(OBJ_DIR)/apps $(OBJ_DIR)/renderers $(BIN_DIR)/apps $(BIN_DIR)/renderers
@@ -73,6 +74,12 @@ $(VIEWER_TARGET): $(BIN_DIR)/seq_core.stamp $(VIEWER_OBJS)
 	g++ -std=c++20 -Wall -O3 -I./include -o $@ \
 		$(BIN_DIR)/viewer_objs/*.o $(VIEWER_OBJS) \
 		$(LDFLAGS_COMMON) $(LDFLAGS_GLUT)
+	@echo "Built $@"
+
+# VTK converter (standalone, no dependencies on simulation code)
+$(VTK_CONVERTER): $(SRC_DIR)/tools/checkpoint_to_vtk.cpp
+	@mkdir -p $(BIN_DIR)
+	g++ -std=c++17 -Wall -O2 -I./include -o $@ $<
 	@echo "Built $@"
 
 # Special rule to build core objects for viewer (always sequential)
@@ -95,7 +102,7 @@ $(BIN_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@)
 	g++ -std=c++20 -Wall -O3 -I./include -c -o $@ $<
 
-.PHONY: clean run run_viewer debug help seq mpi
+.PHONY: clean run run_viewer debug help seq mpi vtk
 
 clean:
 	rm -rf $(BIN_DIR)
@@ -106,6 +113,8 @@ seq:
 
 mpi:
 	$(MAKE) MODE=mpi
+
+vtk: $(VTK_CONVERTER)
 
 run: $(HEADLESS_TARGET)
 	./$(HEADLESS_TARGET)
@@ -118,9 +127,10 @@ debug: clean all
 
 help:
 	@echo "Targets:"
-	@echo "  make seq          - Build sequential headless + viewer"
-	@echo "  make mpi          - Build MPI headless + viewer"
-	@echo "  all               - Build headless + viewer"
+	@echo "  make seq          - Build sequential headless + viewer + vtk converter"
+	@echo "  make mpi          - Build MPI headless + viewer + vtk converter"
+	@echo "  make vtk          - Build only the VTK converter"
+	@echo "  all               - Build headless + viewer + vtk converter"
 	@echo "  run               - Run headless app"
 	@echo "  run_viewer        - Run OpenGL viewer"
 	@echo "  debug             - Debug build"
@@ -130,3 +140,7 @@ help:
 	@echo "  bin/nbody_headless_seq  - Sequential headless"
 	@echo "  bin/nbody_headless_mpi  - MPI headless"
 	@echo "  bin/nbody_viewer        - Viewer (always sequential)"
+	@echo "  bin/checkpoint_to_vtk   - Checkpoint to VTK converter"
+	@echo ""
+	@echo "VTK Converter Usage:"
+	@echo "  ./bin/checkpoint_to_vtk simulation_output.bin ./vtk_output [--every N]"
