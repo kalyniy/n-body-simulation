@@ -75,6 +75,7 @@ int main(int argc, char **argv)
     std::size_t steps    = 1000;
     std::size_t randomN  = 0;
     bool use_solar       = false;
+    bool disable_output = false;
 
     // -----------------------
     // Parse command line args
@@ -113,6 +114,10 @@ int main(int argc, char **argv)
         {
             params.G = std::stof(argv[++i]);
             sim.setG(params.G);
+        }
+        else if (a == "--disable-output")
+        {
+            disable_output = true;
         }
     }
 
@@ -306,6 +311,8 @@ int main(int argc, char **argv)
     // -----------------
     // Checkpoint header
     // -----------------
+    if (!disable_output)
+    {
 #ifdef USE_MPI
     if (rank == 0)
     {
@@ -332,6 +339,7 @@ int main(int argc, char **argv)
         checkpoint->write_masses(sim.particles().data(), n_particles_global);
     }
 #endif
+    }
 
 #ifdef USE_MPI
     MPI_Barrier(MPI_COMM_WORLD);
@@ -366,31 +374,40 @@ int main(int argc, char **argv)
 
             if (rank == 0)
             {
-                CheckpointManager* checkpoint = CheckpointManager::getInstance();
-                checkpoint->write_step(global_buffer.data(), n_particles_global);
+                if (!disable_output)
+                {
+                    CheckpointManager* checkpoint = CheckpointManager::getInstance();
+                    checkpoint->write_step(global_buffer.data(), n_particles_global);
 
-                if (step % log_step_size == 0) {
-                    std::cout << "Step " << step << " / " << steps << " completed\n";
+                    if (step % log_step_size == 0) {
+                        std::cout << "Step " << step << " / " << steps << " completed\n";
+                    }
                 }
             }
         } else {
             // ----- BarnesHutMpi: full data on each rank -----
             if (rank == 0) {
-                CheckpointManager* checkpoint = CheckpointManager::getInstance();
-                checkpoint->write_step(sim.particles().data(), n_particles_global);
+                if (!disable_output)
+                {
+                    CheckpointManager* checkpoint = CheckpointManager::getInstance();
+                    checkpoint->write_step(sim.particles().data(), n_particles_global);
 
-                if (step % log_step_size == 0) {
-                    std::cout << "Step " << step << " / " << steps << " completed\n";
+                    if (step % log_step_size == 0) {
+                        std::cout << "Step " << step << " / " << steps << " completed\n";
+                    }
                 }
             }
         }
 #else
-        // Sequential
-        CheckpointManager* checkpoint = CheckpointManager::getInstance();
-        checkpoint->write_step(sim.particles().data(), n_particles_global);
+        if (!disable_output)
+        {
+            // Sequential
+            CheckpointManager* checkpoint = CheckpointManager::getInstance();
+            checkpoint->write_step(sim.particles().data(), n_particles_global);
 
-        if (step % log_step_size == 0) {
-            std::cout << "Step " << step << " / " << steps << " completed\n";
+            if (step % log_step_size == 0) {
+                std::cout << "Step " << step << " / " << steps << " completed\n";
+            }
         }
 #endif
     }
@@ -406,7 +423,7 @@ int main(int argc, char **argv)
 #ifdef USE_MPI
     if (rank == 0)
     {
-        logger.log(n_particles_global, steps, simulation_time);
+        logger.log(n_particles_global, steps, simulation_time, processes_count);
         std::cout << "Simulation completed in " << simulation_time << " seconds\n";
     }
 #else
