@@ -3,7 +3,7 @@
 # Configuration
 MAX_NP=8                    # Maximum number of processes (change to 16, etc.)
 RUNS_PER_CONFIG=5           # Number of runs per configuration
-N_START=70000               # Starting particle count
+N_START=10000               # Starting particle count
 N_END=100000                # Ending particle count
 STEPS=100                   # Number of simulation steps
 EXECUTABLE="./bin/nbody_headless_mpi"
