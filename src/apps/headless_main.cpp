@@ -37,7 +37,7 @@ int main(int argc, char **argv)
 
     std::unique_ptr<SimulationAlgorithm> algorithm;
     AlgorithmKind algo_kind;
-    bool isNaive = false;
+    bool isNaive = true;
     
 #ifdef USE_MPI
     if (isNaive)
