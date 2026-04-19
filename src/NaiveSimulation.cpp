@@ -1,51 +1,57 @@
 #include "NaiveSimulation.h"
-
-#include <stdlib.h>
 #include <cmath>
-#include <vector>
 
-void NaiveSimulation::computeStep(std::vector<particle_t>& particles, const SimParams& params) {
-    computeAccelerations_(particles, params);
-    integrate_(particles, params);
+void NaiveSimulation::computeStep(ParticleSoA& p, const SimParams& params) {
+    computeAccelerations_(p, params);
+    integrate_(p, params);
 }
 
-void NaiveSimulation::computeAccelerations_(std::vector<particle_t>& particles, const SimParams& params)
+void NaiveSimulation::computeAccelerations_(ParticleSoA& p, const SimParams& params)
 {
     const float eps2 = params.min_r2;
     const float G = params.G;
-    const size_t n = particles.size();
+    const size_t n = p.size();
 
-    for (auto &p : particles)
-        p.acceleration = {0, 0, 0};
+    p.zeroAccelerations();
 
     for (size_t i = 0; i < n; ++i)
     {
-        particle_t &a = particles[i];
-
         for (size_t j = i + 1; j < n; ++j)
         {
-            particle_t &b = particles[j];
-            vector3_t r = b.position - a.position;
-            float r2 = r.x * r.x + r.y * r.y + r.z * r.z + eps2;
+            float rx = p.pos_x[j] - p.pos_x[i];
+            float ry = p.pos_y[j] - p.pos_y[i];
+            float rz = p.pos_z[j] - p.pos_z[i];
+            float r2 = rx * rx + ry * ry + rz * rz + eps2;
 
             float inv_r = 1.0f / std::sqrt(r2);
             float inv_r3 = inv_r * inv_r * inv_r;
 
-            vector3_t acc = r * (G * inv_r3);
-            vector3_t a_acc_d = acc * b.mass;
-            vector3_t b_acc_d = acc * a.mass;
-            a.acceleration += a_acc_d;
-            b.acceleration -= b_acc_d;
+            float ax = G * inv_r3 * rx;
+            float ay = G * inv_r3 * ry;
+            float az = G * inv_r3 * rz;
+
+            p.acc_x[i] += ax * p.mass[j];
+            p.acc_y[i] += ay * p.mass[j];
+            p.acc_z[i] += az * p.mass[j];
+
+            p.acc_x[j] -= ax * p.mass[i];
+            p.acc_y[j] -= ay * p.mass[i];
+            p.acc_z[j] -= az * p.mass[i];
         }
     }
 }
 
-void NaiveSimulation::integrate_(std::vector<particle_t>& particles, const SimParams& params)
+void NaiveSimulation::integrate_(ParticleSoA& p, const SimParams& params)
 {
     const float dt = params.dt;
-    for (auto &p : particles)
+    for (size_t i = 0; i < p.size(); ++i)
     {
-        p.velocity += p.acceleration * dt;
-        p.position += p.velocity * dt;
+        p.vel_x[i] += p.acc_x[i] * dt;
+        p.vel_y[i] += p.acc_y[i] * dt;
+        p.vel_z[i] += p.acc_z[i] * dt;
+
+        p.pos_x[i] += p.vel_x[i] * dt;
+        p.pos_y[i] += p.vel_y[i] * dt;
+        p.pos_z[i] += p.vel_z[i] * dt;
     }
 }

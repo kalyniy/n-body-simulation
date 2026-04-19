@@ -10,56 +10,49 @@ std::mutex CheckpointManager::mtx;
 
 void CheckpointManager::write_header(SimulationOutputHeader header)
 {
-    std::ofstream file(this->filePath, std::ios::out | std::ios::trunc | std::ios::binary);
+    std::ofstream file(filePath, std::ios::out | std::ios::trunc | std::ios::binary);
     
     if (!file) {
-        perror("Error opening file for writing header\n");
+        perror("Error writing header");
         #ifdef USE_MPI
         MPI_Finalize();
         #endif
-        exit(EXIT_FAILURE);
+        std::exit(EXIT_FAILURE);
     }
 
     file.write(reinterpret_cast<const char*>(&header), sizeof(SimulationOutputHeader));
     file.close();
 }
 
-void CheckpointManager::write_masses(particle_t* particles, int count)
+void CheckpointManager::write_masses(const ParticleSoA& particles)
 {
-    std::fstream file(this->filePath, std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
+    std::fstream file(filePath, std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
     
-    if (!file) {
-        perror("Error opening file for writing masses\n");
+    if (!file) { 
+        perror("Error writing masses");
         #ifdef USE_MPI
         MPI_Finalize();
         #endif
-        exit(EXIT_FAILURE);
+        std::exit(EXIT_FAILURE);
     }
 
-    float* masses = new float[count];
-    for (int i = 0; i < count; i++) {
-        masses[i] = particles[i].mass;
-    }
+    file.write(reinterpret_cast<const char*>(particles.mass.data()), 
+               particles.size() * sizeof(float));
     
-    file.write(reinterpret_cast<const char*>(masses), count * sizeof(float));
-    
-    delete[] masses;
     file.close();
 }
 
 void CheckpointManager::increment_passed_steps()
 {
-    std::fstream file(this->filePath, std::ios::in | std::ios::out | std::ios::binary);
-    
+    std::fstream file(filePath, std::ios::in | std::ios::out | std::ios::binary);
     if (!file) {
-        perror("Error opening file for incrementing steps\n");
+        perror("Error incrementing steps");
         #ifdef USE_MPI
         MPI_Finalize();
         #endif
-        exit(EXIT_FAILURE);
+        std::exit(EXIT_FAILURE);
     }
 
-    // Read the current header
     SimulationOutputHeader header;
     file.read(reinterpret_cast<char*>(&header), sizeof(SimulationOutputHeader));
     
@@ -73,49 +66,43 @@ void CheckpointManager::increment_passed_steps()
     file.close();
 }
 
-void CheckpointManager::write_step(particle_t* particles, int count)
+void CheckpointManager::write_step(const ParticleSoA& particles)
 {
-    std::fstream file(this->filePath, std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
-    
+    std::fstream file(filePath, std::ios::in | std::ios::out | std::ios::binary | std::ios::ate);
     if (!file) {
-        perror("Error opening file for writing step\n");
+        perror("Error writing step");
         #ifdef USE_MPI
         MPI_Finalize();
         #endif
-        exit(EXIT_FAILURE);
+        std::exit(EXIT_FAILURE);
     }
 
-    // Flatten particle positions into array
-    // Each particle contributes 3 floats (x, y, z)
-    size_t flat_size = count * 3;
-    float* flat_positions = new float[flat_size];
-    
-    for (int i = 0; i < count; i++) {
-        flat_positions[i * 3 + 0] = particles[i].position.x;
-        flat_positions[i * 3 + 1] = particles[i].position.y;
-        flat_positions[i * 3 + 2] = particles[i].position.z;
+    size_t n = particles.size();
+    float pos[3] = { 0.0f, 0.0f, 0.0f };
+
+    // Write interleaved x,y,z positions
+    for (size_t i = 0; i < n; ++i) {
+        pos[0] = particles.pos_x[i];
+        pos[1] = particles.pos_y[i];
+        pos[2] = particles.pos_z[i];
+        file.write(reinterpret_cast<const char*>(pos), sizeof(pos));
     }
-    
-    // Write the flattened positions to the end of the file
-    file.write(reinterpret_cast<const char*>(flat_positions), flat_size * sizeof(float));
-    
-    delete[] flat_positions;
+
     file.close();
-    
-    // Update the passed_steps counter
-    this->increment_passed_steps();
+
+    increment_passed_steps();
 }
 
 SimulationOutputHeader CheckpointManager::read_header()
 {
-    std::ifstream file(this->filePath, std::ios::in | std::ios::binary);
-    
-    if (!file) {
-        perror("Error opening file for reading header\n");
+    std::ifstream file(filePath, std::ios::in | std::ios::binary);
+
+    if (!file) { 
+        perror("Error reading header");
         #ifdef USE_MPI
         MPI_Finalize();
         #endif
-        exit(EXIT_FAILURE);
+        std::exit(EXIT_FAILURE);
     }
 
     SimulationOutputHeader header;
@@ -126,14 +113,13 @@ SimulationOutputHeader CheckpointManager::read_header()
 
 void CheckpointManager::read_masses(float* masses_out, size_t n_particles)
 {
-    std::ifstream file(this->filePath, std::ios::in | std::ios::binary);
-    
+    std::ifstream file(filePath, std::ios::in | std::ios::binary);
     if (!file) {
-        perror("Error opening file for reading masses\n");
+        perror("Error reading masses");
         #ifdef USE_MPI
         MPI_Finalize();
         #endif
-        exit(EXIT_FAILURE);
+        std::exit(EXIT_FAILURE);
     }
 
     file.seekg(sizeof(SimulationOutputHeader), std::ios::beg);
@@ -143,14 +129,13 @@ void CheckpointManager::read_masses(float* masses_out, size_t n_particles)
 
 size_t CheckpointManager::read_step(float* positions_out, size_t step_index)
 {
-    std::ifstream file(this->filePath, std::ios::in | std::ios::binary);
-    
+    std::ifstream file(filePath, std::ios::in | std::ios::binary);
     if (!file) {
-        perror("Error opening file for reading step\n");
+        perror("Error reading step");
         #ifdef USE_MPI
         MPI_Finalize();
         #endif
-        exit(EXIT_FAILURE);
+        std::exit(EXIT_FAILURE);
     }
 
     // Read header to get particle count

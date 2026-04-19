@@ -26,14 +26,7 @@ void NBodySimulation::generateRandom(std::size_t n, int W, int H, int D, float m
     std::uniform_real_distribution<float> pm(minM, maxM);
 
     for (size_t i = 0; i < n; ++i)
-    {
-        particle_t p{};
-        p.position = {px(rng), py(rng), pz(rng)};
-        p.velocity = {0, 0, 0};
-        p.acceleration = {0, 0, 0};
-        p.mass = pm(rng);
-        particles_.push_back(p);
-    }
+        particles_.push_back(px(rng), py(rng), pz(rng), 0, 0, 0, pm(rng));
 }
 
 void NBodySimulation::setupSolarSystem(int W, int H, int D)
@@ -41,159 +34,128 @@ void NBodySimulation::setupSolarSystem(int W, int H, int D)
     particles_.clear();
     particles_.resize(9);
 
-    auto &sun = particles_[0];
-    sun.mass = 1000.0f;
-    sun.position = {(float)W / 2.f, (float)H / 2.f, (float)D / 2.f};
-    sun.velocity = {0, 0, 0};
+    float cx = W/2.f, cy = H/2.f, cz = D/2.f;
+    // Sun
+    particles_.pos_x[0] = cx;
+    particles_.pos_y[0] = cy;
+    particles_.pos_z[0] = cz;
+    particles_.vel_x[0] = 0;
+    particles_.vel_y[0] = 0;
+    particles_.vel_z[0] = 0;
+    particles_.mass[0] = 1000.f;
 
-    auto set_body = [&](int idx, float rxy, float zoff)
-    {
-        auto &b = particles_[idx];
-        b.mass = 0.02f;
-        b.position = {sun.position.x + rxy, sun.position.y, sun.position.z + zoff};
-        b.velocity = {0, 0, 0};
+    auto set_body = [&](int idx, float rxy, float zoff, float m) {
+        particles_.pos_x[idx] = cx+rxy;
+        particles_.pos_y[idx] = cy;
+        particles_.pos_z[idx] = cz+zoff;
+        particles_.vel_x[idx] = 0;
+        particles_.vel_y[idx] = 0;
+        particles_.vel_z[idx] = 0;
+        particles_.mass[idx] = m;
     };
 
-    set_body(1, 60.f, +10.f); // Mercury-ish
-    set_body(2, 90.f, -5.f);
-    set_body(3, 120.f, 0.f); // Earth-ish
-    set_body(4, 160.f, +15.f);
-    set_body(5, 220.f, -8.f);
-    particles_[5].mass = 0.5f; // Jupiter-ish
-    set_body(6, 280.f, +12.f);
-    particles_[6].mass = 0.3f;
-    set_body(7, 0.f, -15.f);
-    particles_[7].position = {sun.position.x, sun.position.y + 200.f, sun.position.z - 15.f};
-    particles_[7].mass = 0.1f;
-    set_body(8, 0.f, +8.f);
-    particles_[8].position = {sun.position.x, sun.position.y - 240.f, sun.position.z + 8.f};
-    particles_[8].mass = 0.1f;
+    set_body(1, 60.f, +10.f, 0.02f);
+    set_body(2, 90.f, -5.f, 0.02f);
+    set_body(3, 120.f, 0.f, 0.02f);
+    set_body(4, 160.f, +15.f, 0.02f);
+    set_body(5, 220.f, -8.f, 0.5f);
+    set_body(6, 280.f, +12.f, 0.3f);
+    // Two bodies at different y offsets
+    particles_.pos_x[7]=cx; particles_.pos_y[7]=cy+200.f; particles_.pos_z[7]=cz-15.f;
+    particles_.vel_x[7]=0; particles_.vel_y[7]=0; particles_.vel_z[7]=0; particles_.mass[7]=0.1f;
+    particles_.pos_x[8]=cx; particles_.pos_y[8]=cy-240.f; particles_.pos_z[8]=cz+8.f;
+    particles_.vel_x[8]=0; particles_.vel_y[8]=0; particles_.vel_z[8]=0; particles_.mass[8]=0.1f;
 
-    auto set_circular_xy = [&](particle_t &body, const particle_t &s)
-    {
-        float rx = body.position.x - s.position.x;
-        float ry = body.position.y - s.position.y;
-        float r = std::sqrt(rx * rx + ry * ry);
-        if (r < 1e-6f)
-            return;
-        float v = std::sqrt(params_.G * s.mass / r);
-        float tx = -ry / r, ty = rx / r; // tangential
-        body.velocity = {tx * v, ty * v, 0.0f};
-    };
-
-    for (int i = 1; i < 9; ++i)
-        set_circular_xy(particles_[i], sun);
+    // Set circular orbits
+    for (int i = 1; i < 9; ++i) {
+        float rx = particles_.pos_x[i] - particles_.pos_x[0];
+        float ry = particles_.pos_y[i] - particles_.pos_y[0];
+        float r = std::sqrt(rx*rx + ry*ry);
+        if (r < 1e-6f) continue;
+        float v = std::sqrt(params_.G * particles_.mass[0] / r);
+        float tx = -ry/r, ty = rx/r;
+        particles_.vel_x[i] = tx*v;
+        particles_.vel_y[i] = ty*v;
+        particles_.vel_z[i] = 0.f;
+    }
 }
 
 void NBodySimulation::generateGalaxyDisk(int n_particles, float radius, float thickness)
 {
     particles_.clear();
     particles_.reserve(n_particles);
-    
+
     const float central_mass = 1000000.0f;
-    particle_t center;
-    center.position = {0, 0, 0};
-    center.velocity = {0, 0, 0};
-    center.mass = central_mass;
-    particles_.push_back(center);
-    
+    particles_.push_back(0, 0, 0, 0, 0, 0, central_mass);
+
     for (int i = 1; i < n_particles; ++i) {
-        particle_t p;
-        
         float r = radius * std::sqrt(uniformRandom(0.0f, 1.0f));
         float theta = uniformRandom(0.0f, 2.0f * M_PI);
         float z = gaussianRandom(0.0f, thickness * 0.3f);
-        
-        p.position = {
-            r * std::cos(theta),
-            z,
-            r * std::sin(theta)
-        };
-        
+
+        float px = r * std::cos(theta);
+        float pz = r * std::sin(theta);
+
         float v_orbital = std::sqrt(params_.G * central_mass / r);
-        float v_dispersion = 0.1f * v_orbital;
-        
-        p.velocity = {
-            -v_orbital * std::sin(theta) + gaussianRandom(0.0f, v_dispersion),
-            gaussianRandom(0.0f, v_dispersion * 0.5f),
-            v_orbital * std::cos(theta) + gaussianRandom(0.0f, v_dispersion)
-        };
-        
-        p.mass = uniformRandom(0.5f, 2.0f);
-        particles_.push_back(p);
+        float v_d = 0.1f * v_orbital;
+
+        float vx = -v_orbital * std::sin(theta) + gaussianRandom(0.f, v_d);
+        float vy = gaussianRandom(0.f, v_d * 0.5f);
+        float vz =  v_orbital * std::cos(theta) + gaussianRandom(0.f, v_d);
+
+        particles_.push_back(px, z, pz, vx, vy, vz, uniformRandom(0.5f, 2.0f));
     }
 
     float disk_volume = M_PI * radius * radius * thickness;
-    float volume_per_particle = disk_volume / n_particles;
-    float avg_spacing = std::cbrt(volume_per_particle);
-    
-    float softening = avg_spacing * 0.1f;  // 10% of spacing
+    float avg_spacing = std::cbrt(disk_volume / n_particles);
+    float softening = avg_spacing * 0.1f;
     params_.min_r2 = softening * softening;
-    
-    std::cout << "Disk: avg_spacing = " << avg_spacing 
-              << ", softening = " << softening 
+
+    std::cout << "Disk: avg_spacing = " << avg_spacing
+              << ", softening = " << softening
               << ", min_r2 = " << params_.min_r2 << "\n";
 }
 
-void NBodySimulation::generateClusters(int n_clusters, 
-                                       int particles_per_cluster,
-                                       float cluster_separation) 
+void NBodySimulation::generateClusters(int n_clusters, int particles_per_cluster, float cluster_separation)
 {
     particles_.clear();
     particles_.reserve(n_clusters * particles_per_cluster);
-    
+
     for (int c = 0; c < n_clusters; ++c) {
         float angle = (2.0f * M_PI * c) / n_clusters;
-        vector3_t cluster_center = {
-            cluster_separation * std::cos(angle),
-            uniformRandom(-50.0f, 50.0f),
-            cluster_separation * std::sin(angle)
-        };
-        
+        float ccx = cluster_separation * std::cos(angle);
+        float ccy = uniformRandom(-50.0f, 50.0f);
+        float ccz = cluster_separation * std::sin(angle);
+
         float speed = 5.0f;
-        vector3_t cluster_velocity = {
-            -speed * std::cos(angle),
-            0.0f,
-            -speed * std::sin(angle)
-        };
-        
+        float cvx = -speed * std::cos(angle);
+        float cvz = -speed * std::sin(angle);
+
+        float cluster_radius = 100.0f;
         for (int i = 0; i < particles_per_cluster; ++i) {
-            particle_t p;
-            
-            float cluster_radius = 100.0f;
-            p.position = cluster_center + gaussianRandomVec3(0.0f, cluster_radius);
-            p.velocity = cluster_velocity + gaussianRandomVec3(0.0f, 2.0f);
-            p.mass = uniformRandom(0.8f, 1.2f);
-            
-            particles_.push_back(p);
+            auto gv = gaussianRandomVec3(0.0f, cluster_radius);
+            auto rv = gaussianRandomVec3(0.0f, 2.0f);
+            particles_.push_back(ccx+gv.x, ccy+gv.y, ccz+gv.z,
+                                  cvx+rv.x, rv.y, cvz+rv.z,
+                                  uniformRandom(0.8f, 1.2f));
         }
     }
 }
 
-void NBodySimulation::generatePlummerSphere(int n_particles, 
-                                           float scale_radius,
-                                           float total_mass)
+void NBodySimulation::generatePlummerSphere(int n_particles, float scale_radius, float total_mass)
 {
     particles_.clear();
     particles_.reserve(n_particles);
-    
-    // If total_mass not specified, use 1.0 per particle
-    if (total_mass < 0.0f) {
-        total_mass = static_cast<float>(n_particles);
-    }
+
+    if (total_mass < 0.0f) total_mass = static_cast<float>(n_particles);
     float particle_mass = total_mass / n_particles;
-    
-    // Calculate softening based on Plummer sphere density
-    // Effective radius containing ~90% of mass is about 2.4 * scale_radius
+
     float effective_radius = 2.4f * scale_radius;
-    float sphere_volume = (4.0f/3.0f) * M_PI * 
-                          effective_radius * effective_radius * effective_radius;
-    float volume_per_particle = sphere_volume / n_particles;
-    float avg_spacing = std::cbrt(volume_per_particle);
-    float softening = avg_spacing * 0.15f;  // 15% for clusters
-    
+    float sphere_volume = (4.f/3.f)*M_PI*effective_radius*effective_radius*effective_radius;
+    float avg_spacing = std::cbrt(sphere_volume / n_particles);
+    float softening = avg_spacing * 0.15f;
     params_.min_r2 = softening * softening;
-    
+
     std::cout << "Generating Plummer Sphere:\n"
               << "  Particles: " << n_particles << "\n"
               << "  Scale radius: " << scale_radius << "\n"
@@ -202,66 +164,40 @@ void NBodySimulation::generatePlummerSphere(int n_particles,
               << "  Avg spacing: " << avg_spacing << "\n"
               << "  Softening: " << softening << " (min_r2 = " << params_.min_r2 << ")\n";
     
-    // Generate particles
-    for (int i = 0; i < n_particles; ++i)
-    {
-        particle_t p;
-        p.mass = particle_mass;
-        
-        // ===== POSITION: Sample from Plummer density profile =====
-        // Plummer density: ρ(r) = (3M / 4πa³) × (1 + r²/a²)^(-5/2)
-        // Cumulative mass: M(r) = M × r³ / (r² + a²)^(3/2)
-        // Inverse: r = a / sqrt(u^(-2/3) - 1), where u ~ Uniform(0,1)
-        
+    for (int i = 0; i < n_particles; ++i) {
         float u = uniformRandom(0.001f, 1.0f);
         float r = scale_radius / std::sqrt(std::pow(u, -2.0f/3.0f) - 1.0f);
-        
-        // Random direction on sphere
-        p.position = uniformRandomOnSphere(r);
-        
-        // ===== VELOCITY: Sample from isotropic distribution function =====
-        // For a self-consistent Plummer sphere in virial equilibrium:
-        // Escape velocity: v_esc² = 2 × Φ(r), where Φ(r) = -GM / sqrt(r² + a²)
-        // Distribution function requires rejection sampling
-        
-        float x = 0.0f;  // Ratio v / v_esc
-        float y = 0.0f;
-        
-        // Rejection sampling for velocity magnitude
-        // f(v) from Plummer's DF (Aarseth et al. 1974)
+        auto pos = uniformRandomOnSphere(r);
+
+        float x = 0.f, y = 0.f;
         while (true) {
-            x = uniformRandom(0.0f, 1.0f);
-            y = uniformRandom(0.0f, 0.1f);  // Upper bound on g(x)
-            
-            float g_x = x * x * std::pow(1.0f - x * x, 3.5f);
-            
-            if (y < g_x) {
-                break;  // Accept this sample
-            }
+            x = uniformRandom(0.f, 1.f);
+            y = uniformRandom(0.f, 0.1f);
+            float gx = x*x * std::pow(1.f - x*x, 3.5f);
+            if (y < gx) break;
         }
-        
-        // Calculate escape velocity at this radius
-        float r2_plus_a2 = r * r + scale_radius * scale_radius;
-        float v_escape = std::sqrt(2.0f * params_.G * total_mass / std::sqrt(r2_plus_a2));
-        
-        // Actual velocity magnitude
-        float v = x * v_escape;
-        
-        // Random direction for velocity (isotropic)
-        p.velocity = uniformRandomOnSphere(v);
-        
-        particles_.push_back(p);
+
+        float r2a2 = r*r + scale_radius*scale_radius;
+        float v_esc = std::sqrt(2.f * params_.G * total_mass / std::sqrt(r2a2));
+        float v = x * v_esc;
+        auto vel = uniformRandomOnSphere(v);
+
+        particles_.push_back(pos.x, pos.y, pos.z, vel.x, vel.y, vel.z, particle_mass);
     }
-    
-    vector3_t total_momentum = {0, 0, 0};
-    float total_m = 0;
-    for (const auto& p : particles_) {
-        total_momentum += p.velocity * p.mass;
-        total_m += p.mass;
+
+    // Remove bulk velocity
+    float tot_px=0,tot_py=0,tot_pz=0,tot_m=0;
+    for (size_t i = 0; i < particles_.size(); ++i) {
+        tot_px += particles_.vel_x[i]*particles_.mass[i];
+        tot_py += particles_.vel_y[i]*particles_.mass[i];
+        tot_pz += particles_.vel_z[i]*particles_.mass[i];
+        tot_m  += particles_.mass[i];
     }
-    vector3_t bulk_velocity = total_momentum * (1.0f / total_m);
-    for (auto& p : particles_) {
-        p.velocity -= bulk_velocity;
+    float bvx=tot_px/tot_m, bvy=tot_py/tot_m, bvz=tot_pz/tot_m;
+    for (size_t i = 0; i < particles_.size(); ++i) {
+        particles_.vel_x[i] -= bvx;
+        particles_.vel_y[i] -= bvy;
+        particles_.vel_z[i] -= bvz;
     }
     std::cout << "Plummer sphere generated successfully!\n";
 }
@@ -269,15 +205,14 @@ void NBodySimulation::generatePlummerSphere(int n_particles,
 void NBodySimulation::step()
 {
     algorithm_->computeStep(particles_, params_);
-    //std::cout << "computed step.\n";
     {
         std::lock_guard<std::mutex> lock(buffer_mutex_);
-        render_buffer_ = particles_;  // or use std::swap
+        render_buffer_ = particles_;
         buffer_ready_ = true;
     }
 }
 
-const std::vector<particle_t>& NBodySimulation::getRenderBuffer() 
+const ParticleSoA& NBodySimulation::getRenderBuffer()
 {
     std::lock_guard<std::mutex> lock(buffer_mutex_);
     return render_buffer_;

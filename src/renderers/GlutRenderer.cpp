@@ -1,15 +1,9 @@
 #include "renderers/GlutRenderer.h"
-#include "Simulation.h"
-#include "Utils.hpp"
 #include <iostream>
-#include <algorithm>
-#include <time.h>
-#include <sys/time.h>
 
 GlutRenderer *GlutRenderer::instance_ = nullptr;
 
-GlutRenderer::GlutRenderer(int *pargc, char **argv, int w, int h)
-{
+GlutRenderer::GlutRenderer(int *pargc, char **argv, int w, int h) {
     instance_ = this;
     glutInit(pargc, argv);
     glutInitDisplayMode(GLUT_DOUBLE | GLUT_RGB | GLUT_DEPTH);
@@ -29,12 +23,12 @@ GlutRenderer::GlutRenderer(int *pargc, char **argv, int w, int h)
     glColorMaterial(GL_FRONT, GL_AMBIENT_AND_DIFFUSE);
     glClearColor(0, 0, 0, 1);
 
-    glutDisplayFunc(GlutRenderer::sDisplay);
-    glutReshapeFunc(GlutRenderer::sReshape);
-    glutMouseFunc(GlutRenderer::sMouse);
-    glutMotionFunc(GlutRenderer::sMotion);
-    glutKeyboardFunc(GlutRenderer::sKeyboard);
-    glutIdleFunc(GlutRenderer::sIdle);
+    glutDisplayFunc(sDisplay);
+    glutReshapeFunc(sReshape);
+    glutMouseFunc(sMouse);
+    glutMotionFunc(sMotion);
+    glutKeyboardFunc(sKeyboard);
+    glutIdleFunc(sIdle);
 
     std::cout << "Controls:\n"
               << "  Mouse drag: rotate\n"
@@ -43,8 +37,6 @@ GlutRenderer::GlutRenderer(int *pargc, char **argv, int w, int h)
               << "  R: reset camera\n"
               << "  ESC: quit\n";
 }
-
-//void GlutRenderer::attachParticles(const std::vector<particle_t> *p) { particles_ = p; }
 
 void GlutRenderer::attachSimulation(NBodySimulation* sim)
 {
@@ -95,48 +87,24 @@ void GlutRenderer::sIdle()
         instance_->idle_();
 }
 
-void GlutRenderer::display_()
-{
+void GlutRenderer::display_() {
     if (!simulation_) return;
-    
-    const auto& render_particles = simulation_->getRenderBuffer();
-    
+    const auto& p = simulation_->getRenderBuffer();
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     glLoadIdentity();
-    
+
     glTranslatef(0.f, 0.f, -camera_distance_);
     glRotatef(camera_angle_x_, 1.f, 0.f, 0.f);
     glRotatef(camera_angle_y_, 0.f, 1.f, 0.f);
     
-    // Debug output
-    static int frame_count = 0;
-    if (frame_count % 60 == 0 && !render_particles.empty())
+    for (size_t i = 0; i < p.size(); ++i)
     {
-        std::cout << "Rendering " << render_particles.size() << " particles" << std::endl;
-        std::cout << "First particle: (" 
-                  << render_particles[0].position.x << ", "
-                  << render_particles[0].position.y << ", "
-                  << render_particles[0].position.z << ")" << std::endl;
+        glPushMatrix();
+        glTranslatef(p.pos_x[i], p.pos_y[i], p.pos_z[i]);
+        glColor3f(1.f, 0.5f, 0.f);
+        glutSolidSphere(2.f, 8, 6);
+        glPopMatrix();
     }
-    frame_count++;
-    
-    // Draw particles
-    if (!render_particles.empty())
-    {
-        for (const auto &p : render_particles)
-        {
-            glPushMatrix();
-            glTranslatef(p.position.x, p.position.y, p.position.z);
-            glColor3f(1.f, 0.5f, 0.f);
-            glutSolidSphere(2.f, 8, 6);
-            glPopMatrix();
-        }
-    }
-    else
-    {
-        std::cout << "Warning: No particles to render!" << std::endl;
-    }
-    
     glutSwapBuffers();
 }
 
@@ -179,9 +147,13 @@ void GlutRenderer::motion_(int x, int y)
     mouse_y_ = y;
     glutPostRedisplay();
 }
-/*
-void GlutRenderer::keyboard_(unsigned char key, int, int)
-{
+
+void GlutRenderer::keyboard_(unsigned char key,int x,int y) {
+    if (keyboard_fn_)
+    {
+        keyboard_fn_(key, x, y);
+    }
+
     switch (key)
     {
     case ' ':
@@ -198,39 +170,10 @@ void GlutRenderer::keyboard_(unsigned char key, int, int)
         break;
     }
 }
-*/
 
 void GlutRenderer::idle_()
 {
     if (animate_ && step_fn_)
         step_fn_();
     glutPostRedisplay();
-}
-
-void GlutRenderer::keyboard_(unsigned char key, int x, int y)
-{
-    // Call custom keyboard handler first if set
-    if (keyboard_fn_)
-    {
-        keyboard_fn_(key, x, y);
-    }
-    
-    // Default controls
-    switch (key)
-    {
-    case ' ':
-        animate_ = !animate_;
-        std::cout << (animate_ ? "Playing" : "Paused") << std::endl;
-        break;
-    case 'r':
-    case 'R':
-        camera_angle_x_ = camera_angle_y_ = 0.f;
-        camera_distance_ = 800.f;
-        std::cout << "Camera reset" << std::endl;
-        break;
-    case 27: // ESC
-        should_close_ = true;
-        std::exit(0);
-        break;
-    }
 }
