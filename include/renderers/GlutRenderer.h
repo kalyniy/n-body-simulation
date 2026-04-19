@@ -1,39 +1,29 @@
 #pragma once
 #ifdef __APPLE__
-#define MACOS
-#endif
-
-#ifdef MACOS
 #define GL_SILENCE_DEPRECATION
 #include <GLUT/glut.h>
 #else
 #include <GL/glut.h>
 #endif
 
-#include <vector>
 #include <functional>
 #include "Renderer.h"
-//#include "Particle.hpp"
 #include "Simulation.h"
 // Minimal GLUT renderer that can "drive" a simulation via a callback.
-class GlutRenderer : public Renderer
-{
+class GlutRenderer : public Renderer {
 public:
-    using StepFn = std::function<void()>; // called each idle frame to advance sim
+    using StepFn = std::function<void()>;
     using KeyboardFn = std::function<void(unsigned char, int, int)>;
     void onKeyboard(KeyboardFn fn) { keyboard_fn_ = std::move(fn); }
 
     GlutRenderer(int *pargc, char **argv, int w, int h);
     ~GlutRenderer() override = default;
 
-    //void attachParticles(const std::vector<particle_t> *particles);
     void attachSimulation(NBodySimulation* sim);
     void onStep(StepFn fn); // optional: sim->step() provided from app
-
-    void draw(const std::vector<particle_t> &particles) override; // not used directly
+    void draw(const ParticleSoA &particles) override; // not used directly
     void processEvents() override;                                // GLUT takes over
     bool shouldClose() const override { return should_close_; }
-
 private:
     static GlutRenderer *instance_;
     static void sDisplay();
@@ -49,10 +39,7 @@ private:
     void motion_(int x, int y);
     void keyboard_(unsigned char key, int x, int y);
     void idle_();
-
-private:
     NBodySimulation* simulation_ = nullptr; 
-    //const std::vector<particle_t> *particles_ = nullptr;
     StepFn step_fn_{};
     KeyboardFn keyboard_fn_{};
 

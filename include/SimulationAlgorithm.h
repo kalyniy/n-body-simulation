@@ -1,6 +1,6 @@
 #pragma once
-#include "Particle.hpp"
-#include <vector>
+#include "ParticleSoA.h"
+
 struct SimParams
 {
     float G = 1.0f;
@@ -12,11 +12,15 @@ enum class AlgorithmKind {
     NaiveSeq,
     NaiveMpi,
     BarnesHutSeq,
-    BarnesHutMpi
+    BarnesHutMpi,
+    NaiveCuda,
+    NaiveCudaMpi,
+    BarnesHutCuda,
+    BarnesHutCudaMpi
 };
 
 class SimulationAlgorithm {
 public:
     virtual ~SimulationAlgorithm() = default;
-    virtual void computeStep(std::vector<particle_t>& particles, const SimParams& params) = 0;
+    virtual void computeStep(ParticleSoA& particles, const SimParams& params) = 0;
 };

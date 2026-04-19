@@ -5,7 +5,7 @@
 #include <memory>
 #include <atomic>
 #include <mutex>
-#include "Particle.hpp"
+#include "ParticleSoA.h"
 #include "SimulationAlgorithm.h"
 
 class NBodySimulation
@@ -14,8 +14,8 @@ public:
     explicit NBodySimulation(std::unique_ptr<SimulationAlgorithm> algorithm, SimParams params = {})
         : algorithm_(std::move(algorithm)), params_(params) {}
 
-    std::vector<particle_t> &particles() { return particles_; }
-    const std::vector<particle_t> &particles() const { return particles_; }
+    ParticleSoA &particles() { return particles_; }
+    const ParticleSoA &particles() const { return particles_; }
 
     void clear();
     void reserve(std::size_t n);
@@ -32,7 +32,7 @@ public:
 
     // One physics step (no rendering)
     void step();
-    const std::vector<particle_t>& getRenderBuffer();
+    const ParticleSoA& getRenderBuffer();
 
     // Config
     void setG(float g) { params_.G = g; }
@@ -47,12 +47,13 @@ public:
     }
     
     const SimParams &params() const { return params_; }
+    SimParams &params() { return params_; }
 
 private:
     std::unique_ptr<SimulationAlgorithm> algorithm_;
     SimParams params_{};
-    std::vector<particle_t> particles_;
-    std::vector<particle_t> render_buffer_;  // double buffer for rendering
+    ParticleSoA particles_;
+    ParticleSoA render_buffer_;  // double buffer for rendering
     std::atomic<bool> buffer_ready_{false};
     std::mutex buffer_mutex_;
 };

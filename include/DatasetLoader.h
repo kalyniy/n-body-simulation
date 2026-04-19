@@ -4,15 +4,14 @@
 #include <vector>
 #include <filesystem>
 #include <fstream>
-
-#include "Particle.hpp"
+#include "ParticleSoA.h"
 
 class DatasetLoader
 {
 public:
     static size_t count_floats(const std::string &path);
     static void read_f32(const std::string &path, float *dst, size_t N);
-    static void load_hacc_snapshot(std::vector<particle_t> *particles, const std::string &dir);
+    static void load_hacc_snapshot(ParticleSoA *particles, const std::string &dir);
 
     DatasetLoader() = delete;
 };

@@ -1,10 +1,9 @@
 // BarnesHutSimulation.h
 #pragma once
 #include "SimulationAlgorithm.h"
-#include "Particle.hpp"
+#include "ParticleSoA.h"
 #include "Octree.hpp"
 #include <vector>
-#include <iostream>
 
 #ifdef USE_MPI
 #include <mpi.h>
@@ -15,39 +14,35 @@ public:
     explicit BarnesHutSimulation(float theta = 0.5f,
                                  int   leafBucketSize = 8,
                                  int   maxDepth = 32);
-
     void setTheta(float t) { theta_ = t; }
-
-    void computeStep(std::vector<particle_t>& particles,
+    void computeStep(ParticleSoA& particles,
                      const SimParams& params) override;
 
 private:
-    void computeAccelerations_(std::vector<particle_t>& particles,
+    void computeAccelerations_(ParticleSoA& particles,
                                const SimParams& params);
-    void integrate_(std::vector<particle_t>& particles,
+    void integrate_(ParticleSoA& p,
                     const SimParams& params);
     
 #ifdef USE_MPI
-    void computeAccelerationsMPI_(std::vector<particle_t>& particles,
-                                  const SimParams& params);
-    void integrateMPI_(std::vector<particle_t>& particles,
-                       const SimParams& params);
+    void computeAccelerationsMPI_(ParticleSoA& p, const SimParams& params);
+    void integrateMPI_(ParticleSoA& p, const SimParams& params);
 
-    // MPI-friendly broadcasted tree
-    std::vector<Octree::MpiTreeNode>       mpi_nodes_;
-    std::vector<Octree::MpiLeafParticle>   mpi_leafParticles_;
-
-    // buffers used on rank 0 for gather & tree build
+    std::vector<Octree::FlatTreeNode>     mpi_nodes_;
+    std::vector<Octree::FlatLeafParticle> mpi_leaves_;
     std::vector<float>                     globalPosMass_;   // 4 floats per particle: x,y,z,m
-    std::vector<particle_t>                globalParticles_;
 
-    void traverseMpiTreeAccumulate_(int nodeId,
-                                    int i,
-                                    float G,
-                                    float eps2,
-                                    float theta,
-                                    vector3_t& acc,
-                                    const std::vector<particle_t>& particles) const;
+    void traverseMpiTree_(int nodeId,
+                          int i,
+                          const float* px,
+                          const float* py,
+                          const float* pz,
+                          float G,
+                          float eps2,
+                          float theta,
+                          float& ax,
+                          float& ay,
+                          float& az) const;
 #endif
 
     float              theta_;

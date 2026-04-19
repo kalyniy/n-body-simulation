@@ -1,13 +1,10 @@
 #pragma once
-#include <vector>
-#include "Particle.hpp"
+#include "ParticleSoA.h"
 
-// Tiny interface to allow different backends (GLUT, SDL, Vulkan, etc.)
-class Renderer
-{
+class Renderer {
 public:
     virtual ~Renderer() = default;
-    virtual void draw(const std::vector<particle_t> &particles) = 0;
+    virtual void draw(const ParticleSoA &particles) = 0;
     virtual void processEvents() = 0;
     virtual bool shouldClose() const = 0;
 };
