@@ -277,12 +277,16 @@ private:
             return;
         }
 
-        // Internal node: export children
+        // Internal node: export children, packed to the front of child[].
+        // Paper section 6.3.4: "move all non-null child pointers to the front"
+        // to enable early-null-termination in the force-calculation kernel.
+        int packed = 0;
         for (int oct = 0; oct < 8; ++oct) {
             int ci = n.child[oct];
             if (ci == -1) continue;
             exportNodeRecursive_(ci, outNodes, outLeafParticles, idMap);
-            outNodes[newIdx].child[oct] = idMap[ci];
+            outNodes[newIdx].child[packed] = idMap[ci];
+            ++packed;
         }
     }
 };

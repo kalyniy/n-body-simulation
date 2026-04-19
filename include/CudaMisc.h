@@ -3,6 +3,10 @@
 #include <stdio.h>
 #include <cuda_runtime.h>
 
+#ifdef USE_MPI
+#include <mpi.h>
+#endif
+
 static inline void cudaCheck(cudaError_t e, const char* msg) {
     if (e != cudaSuccess) {
         fprintf(stderr, "CUDA error: %s: %s\n", msg, cudaGetErrorString(e));

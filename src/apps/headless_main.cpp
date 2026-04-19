@@ -20,8 +20,9 @@
 
 #ifdef USE_CUDA
 #include "CudaNaiveSimulation.h"
+#include "CudaBarnesHutSimulation.h"
 #ifdef USE_MPI
-#include "CudaMpiNaiveSimulation.h"
+//#include "CudaMpiNaiveSimulation.h"
 #endif
 #endif
 
@@ -57,12 +58,28 @@ struct AlgoResult { std::unique_ptr<SimulationAlgorithm> algo; AlgorithmKind kin
 static AlgoResult createAlgo(const std::string& name, float theta) {
     bool bh = (name=="bh"||name=="barnes-hut"||name=="barneshut");
     if (bh) {
-        throw std::runtime_error("CUDA barns hut is not implemented yet");
-
+#if defined(USE_CUDA)&&defined(USE_MPI)
+        std::cout<<"[algo] CudaBarnesHut+MPI\n";
+        return {std::make_unique<CudaBarnesHutSimulation>(theta),AlgorithmKind::BarnesHutCudaMpi};
+#elif defined(USE_CUDA)
+        std::cout<<"[algo] CudaBarnesHut\n";
+        return {std::make_unique<CudaBarnesHutSimulation>(theta),AlgorithmKind::BarnesHutCuda};
+/*
+#elif defined(USE_MPI)
+        std::cout<<"[algo] BarnesHut+MPI\n";
+        return {std::make_unique<BarnesHutSimulation>(theta),AlgorithmKind::BarnesHutMpi};
+*/
+#else
+        std::cout<<"[algo] BarnesHut (seq)\n";
+        return {std::make_unique<BarnesHutSimulation>(theta),AlgorithmKind::BarnesHutSeq};
+#endif
     } else {
 #if defined(USE_CUDA)&&defined(USE_MPI)
+        /*
         std::cout<<"[algo] CudaNaive+MPI\n";
         return {std::make_unique<CudaMpiNaiveSimulation>(),AlgorithmKind::NaiveCudaMpi};
+        */
+        std::exit(EXIT_FAILURE);
 #elif defined(USE_CUDA)
         std::cout<<"[algo] CudaNaive\n";
         return {std::make_unique<CudaNaiveSimulation>(),AlgorithmKind::NaiveCuda};

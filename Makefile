@@ -99,7 +99,9 @@ CORE_CPP_OBJECTS = $(CORE_CPP_SOURCES:$(SRC_DIR)/%.cpp=$(OBJ_DIR)/%.o)
 # ---- CUDA sources (only when USE_CUDA_FLAG=1) ----------------------------
 ifeq ($(USE_CUDA_FLAG),1)
     CORE_CU_SOURCES = \
-        $(SRC_DIR)/CudaNaiveSimulation.cu
+        $(SRC_DIR)/CudaNaiveSimulation.cu \
+        $(SRC_DIR)/CudaBarnesHutSimulation.cu #\
+        #$(SRC_DIR)/CudaMpiNaiveSimulation.cu
     CORE_CU_OBJECTS = $(CORE_CU_SOURCES:$(SRC_DIR)/%.cu=$(OBJ_DIR)/%.cu.o)
 else
     CORE_CU_SOURCES =
@@ -118,7 +120,7 @@ VTK_CONVERTER   = $(BIN_DIR)/checkpoint_to_vtk
 # ---- Targets --------------------------------------------------------------
 
 all: $(BIN_DIR) $(HEADLESS_TARGET) $(VTK_CONVERTER)
-	@echo "Built MODE=$(MODE) → $(HEADLESS_TARGET)"
+	@echo "Built MODE=$(MODE) -> $(HEADLESS_TARGET)"
 
 $(BIN_DIR):
 	mkdir -p $(BIN_DIR) $(OBJ_DIR) $(OBJ_DIR)/apps $(OBJ_DIR)/renderers
@@ -142,12 +144,12 @@ $(VTK_CONVERTER): $(SRC_DIR)/tools/checkpoint_to_vtk.cpp
 
 # ---- Compile rules --------------------------------------------------------
 
-# C++ → .o
+# C++ -> .o
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.cpp
 	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-# CUDA → .cu.o
+# CUDA -> .cu.o
 $(OBJ_DIR)/%.cu.o: $(SRC_DIR)/%.cu
 	@mkdir -p $(dir $@)
 	$(NVCC) $(NVCCFLAGS) -c -o $@ $<
@@ -196,7 +198,7 @@ help:
 	echo "  bin/nbody_headless_mpi       - MPI binary"
 	@echo "  bin/nbody_headless_cuda      - CUDA binary"
 	@echo "  bin/nbody_headless_cuda_mpi  - CUDA+MPI binary"
-	@echo "  bin/checkpoint_to_vtk        - Checkpoint → VTK"
+	@echo "  bin/checkpoint_to_vtk        - Checkpoint -> VTK"
 	@echo "Override CUDA arch:  make cuda CUDA_ARCH=86  (for sm_86)"
 	@echo ""
 	@echo "VTK Converter Usage:"
