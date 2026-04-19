@@ -32,7 +32,7 @@ void BarnesHutSimulation::computeAccelerations_(ParticleSoA& particles, const Si
     particles.zeroAccelerations();
     if (particles.empty()) return;
 
-    int n = static_cast<int>(p.size());
+    int n = static_cast<int>(particles.size());
     Octree tree;
     tree.build(particles.pos_x.data(), particles.pos_y.data(), particles.pos_z.data(),
                particles.mass.data(), n, bp_);
