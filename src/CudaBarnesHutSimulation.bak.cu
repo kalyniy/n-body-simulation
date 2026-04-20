@@ -298,15 +298,15 @@ void CudaBarnesHutSimulation::uploadParticles_(const ParticleSoA& s)
 {
     size_t b = s.size() * sizeof(float);
 
-    cudaCheck(cudaMemcpy(d_px_ s.pos_x.data(), b, cudaMemcpyHostToDevice), "uploadParticles_ cudaMemcpy fail pos_x (host to device)");
-    cudaCheck(cudaMemcpy(d_py_ s.pos_y.data(), b, cudaMemcpyHostToDevice), "uploadParticles_ cudaMemcpy fail pos_y (host to device)");
-    cudaCheck(cudaMemcpy(d_pz_ s.pos_z.data(), b, cudaMemcpyHostToDevice), "uploadParticles_ cudaMemcpy fail pos_z (host to device)");
+    cudaCheck(cudaMemcpy(d_px_, s.pos_x.data(), b, cudaMemcpyHostToDevice), "uploadParticles_ cudaMemcpy fail pos_x (host to device)");
+    cudaCheck(cudaMemcpy(d_py_, s.pos_y.data(), b, cudaMemcpyHostToDevice), "uploadParticles_ cudaMemcpy fail pos_y (host to device)");
+    cudaCheck(cudaMemcpy(d_pz_, s.pos_z.data(), b, cudaMemcpyHostToDevice), "uploadParticles_ cudaMemcpy fail pos_z (host to device)");
 
-    cudaCheck(cudaMemcpy(d_vx_ s.vel_x.data(), b, cudaMemcpyHostToDevice), "uploadParticles_ cudaMemcpy fail vel_x (host to device)");
-    cudaCheck(cudaMemcpy(d_vy_ s.vel_y.data(), b, cudaMemcpyHostToDevice), "uploadParticles_ cudaMemcpy fail vel_y (host to device)");
-    cudaCheck(cudaMemcpy(d_vz_ s.vel_z.data(), b, cudaMemcpyHostToDevice), "uploadParticles_ cudaMemcpy fail vel_z (host to device)");
+    cudaCheck(cudaMemcpy(d_vx_, s.vel_x.data(), b, cudaMemcpyHostToDevice), "uploadParticles_ cudaMemcpy fail vel_x (host to device)");
+    cudaCheck(cudaMemcpy(d_vy_, s.vel_y.data(), b, cudaMemcpyHostToDevice), "uploadParticles_ cudaMemcpy fail vel_y (host to device)");
+    cudaCheck(cudaMemcpy(d_vz_, s.vel_z.data(), b, cudaMemcpyHostToDevice), "uploadParticles_ cudaMemcpy fail vel_z (host to device)");
 
-    cudaCheck(cudaMemcpy(d_mass_, s.mass.data(),  b, cudaMemcpyHostToDevice), "uploadParticles_ cudaMemcpy fail mass (host to device)");
+    cudaCheck(cudaMemcpy(d_mass_, s.mass.data(), b, cudaMemcpyHostToDevice), "uploadParticles_ cudaMemcpy fail mass (host to device)");
 
     device_valid_ = true;
 }
